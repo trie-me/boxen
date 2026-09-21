@@ -1,0 +1,15 @@
+{
+    admin off
+    auto_https disable_redirects
+    skip_install_trust
+}
+
+https://{$BOXEN_HOST:localhost}:8443 {
+    tls internal
+    encode zstd gzip
+    request_body {
+        max_size 26MB
+    }
+    header Strict-Transport-Security "max-age=31536000"
+    reverse_proxy web:8000
+}

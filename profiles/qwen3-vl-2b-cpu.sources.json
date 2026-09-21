@@ -1,0 +1,51 @@
+{
+  "profile_id": "qwen3-vl-2b-q4-cpu",
+  "platform": "linux-x86_64-cpu",
+  "model_repository": "Qwen/Qwen3-VL-2B-Instruct-GGUF",
+  "model_revision": "52d6c8ffea26cc873ac5ad116f8631268d7eb503",
+  "model_license": "Apache-2.0",
+  "model_license_declaration": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/blob/89644892e4d85e24eaac8bacfd4f463576704203/README.md",
+  "runtime_release": "b10977",
+  "runtime_version": "0.4.1-dev (build 10977, commit 0ecb159c9)",
+  "runtime_license": "MIT",
+  "download_bytes_model_projector_runtime": 1569308810,
+  "artifacts": [
+    {
+      "name": "Qwen3VL-2B-Instruct-Q4_K_M.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct-GGUF/resolve/52d6c8ffea26cc873ac5ad116f8631268d7eb503/Qwen3VL-2B-Instruct-Q4_K_M.gguf",
+      "size": 1107409952,
+      "sha256": "089d75c52f4b7ffc56ba998ffc50aae89fcafc755f9e7208aacca281dca6c2ae"
+    },
+    {
+      "name": "mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf",
+      "url": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct-GGUF/resolve/52d6c8ffea26cc873ac5ad116f8631268d7eb503/mmproj-Qwen3VL-2B-Instruct-Q8_0.gguf",
+      "size": 445053216,
+      "sha256": "f9a68fabba69c3b81e153367b2c7521030b0fa8bb0de400c9599c8e6725f9c82"
+    },
+    {
+      "name": "llama-b10977-bin-ubuntu-x64.tar.gz",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10977/llama-b10977-bin-ubuntu-x64.tar.gz",
+      "size": 16845642,
+      "sha256": "f95be64ec0b3fae6281d663e9a92016cf760b7c20b093e560d5e5420dadf7948"
+    },
+    {
+      "name": "Apache-2.0.txt",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    },
+    {
+      "name": "llama-LICENSE",
+      "url": "https://raw.githubusercontent.com/ggml-org/llama.cpp/b10977/LICENSE",
+      "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+    }
+  ],
+  "verification_photo": {
+    "name": "coffee.png",
+    "url": "https://raw.githubusercontent.com/scikit-image/scikit-image/v0.25.2/skimage/data/coffee.png",
+    "sha256": "cc02f8ca188b167c775a7101b5d767d1e71792cf762c33d6fa15a4599b5a8de7",
+    "creator": "Rachel Michetti; courtesy of Pikolo Espresso Bar",
+    "license": "CC0",
+    "license_declaration": "https://github.com/scikit-image/scikit-image/blob/v0.25.2/skimage/data/_fetchers.py#L912-L928"
+  },
+  "qualification": "operational smoke only; not a model accuracy qualification"
+}

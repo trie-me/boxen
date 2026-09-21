@@ -1,0 +1,97 @@
+/* Boxen v1 normative UI design tokens. No remote fonts or assets. */
+:root {
+  color-scheme: dark;
+
+  --bx-color-bg: #070a0e;
+  --bx-color-surface-1: #0c1218;
+  --bx-color-surface-2: #101a22;
+  --bx-color-surface-3: #16232d;
+  --bx-color-text: #f2fbfc;
+  --bx-color-text-muted: #a6bbc3;
+  --bx-color-border: #2a414a;
+  --bx-color-border-strong: #46636d;
+
+  --bx-color-cyan: #62f3ff;
+  --bx-color-cyan-ink: #031417;
+  --bx-color-cyan-soft: #0b343b;
+  --bx-color-magenta: #ff5cbc;
+  --bx-color-magenta-ink: #1a0712;
+  --bx-color-magenta-soft: #3b142c;
+  --bx-color-amber: #ffd166;
+  --bx-color-amber-ink: #191205;
+  --bx-color-amber-soft: #3a2d10;
+  --bx-color-success: #62f6a8;
+  --bx-color-success-ink: #05170e;
+  --bx-color-danger: #ff6978;
+  --bx-color-danger-ink: #1b0709;
+  --bx-color-focus: #fff06a;
+
+  --bx-font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --bx-font-mono: ui-monospace, "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --bx-font-size-xs: 0.75rem;
+  --bx-font-size-sm: 0.875rem;
+  --bx-font-size-md: 1rem;
+  --bx-font-size-lg: 1.125rem;
+  --bx-font-size-xl: 1.375rem;
+  --bx-font-size-2xl: clamp(1.75rem, 4vw, 2.25rem);
+
+  --bx-line-tight: 1.2;
+  --bx-line-body: 1.5;
+  --bx-line-prose: 1.65;
+
+  --bx-space-1: 0.25rem;
+  --bx-space-2: 0.5rem;
+  --bx-space-3: 0.75rem;
+  --bx-space-4: 1rem;
+  --bx-space-5: 1.5rem;
+  --bx-space-6: 2rem;
+  --bx-space-7: 3rem;
+
+  --bx-radius-input: 0.25rem;
+  --bx-radius-panel: 0.375rem;
+  --bx-cut-corner: 0.625rem;
+  --bx-border-width: 1px;
+  --bx-focus-width: 2px;
+
+  --bx-shadow-panel: 0 1rem 2.5rem rgb(0 0 0 / 35%);
+  --bx-glow-cyan: 0 0 1.25rem rgb(98 243 255 / 18%);
+  --bx-glow-magenta: 0 0 1.25rem rgb(255 92 188 / 16%);
+
+  --bx-motion-fast: 120ms;
+  --bx-motion-panel: 180ms;
+  --bx-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --bx-content-max: 90rem;
+  --bx-rail-width: 14.5rem;
+  --bx-topbar-height: 4rem;
+  --bx-touch-target: 2.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --bx-motion-fast: 0ms;
+    --bx-motion-panel: 0ms;
+    --bx-glow-cyan: none;
+    --bx-glow-magenta: none;
+  }
+}
+
+@media (forced-colors: active) {
+  :root {
+    --bx-color-bg: Canvas;
+    --bx-color-surface-1: Canvas;
+    --bx-color-surface-2: Canvas;
+    --bx-color-surface-3: Canvas;
+    --bx-color-text: CanvasText;
+    --bx-color-text-muted: CanvasText;
+    --bx-color-border: ButtonBorder;
+    --bx-color-border-strong: ButtonText;
+    --bx-color-cyan: Highlight;
+    --bx-color-magenta: Highlight;
+    --bx-color-amber: Highlight;
+    --bx-color-success: Highlight;
+    --bx-color-danger: Mark;
+    --bx-color-focus: Highlight;
+  }
+}
