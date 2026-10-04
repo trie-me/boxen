@@ -2,6 +2,8 @@
     admin off
     auto_https disable_redirects
     skip_install_trust
+    # IP-address clients omit TLS SNI; select the configured site's certificate.
+    default_sni {$BOXEN_HOST:localhost}
 }
 
 # Container TLS port is fixed; Compose maps the chosen public port to 8443.

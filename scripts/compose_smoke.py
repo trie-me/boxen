@@ -27,6 +27,7 @@ def main():
     parser.add_argument("--image", default="boxen:container-dev")
     parser.add_argument("--proxy-image", default="boxen-caddy:container-dev")
     parser.add_argument("--port", type=int, default=18743)
+    parser.add_argument("--host", choices=["localhost", "127.0.0.1"], default="localhost")
     parser.add_argument("--model-image", default="boxen-ai:container-dev")
     parser.add_argument("--model-profile", type=Path, help="Existing provisioned profile; copied read-only")
     parser.add_argument("--fixture-image", type=Path, help="Public coffee-cup test photo, not personal data")
@@ -57,26 +58,22 @@ def main():
                 probe.bind((address, port))
     root = Path(__file__).resolve().parents[1]
     project = "boxen-smoke-" + uuid.uuid4().hex[:12]
-    origin = f"https://{args.tailnet_host or 'localhost'}:{args.port}"
+    origin = f"https://{args.tailnet_host or args.host}:{args.port}"
     env = {key: value for key, value in os.environ.items() if not key.startswith(("BOXEN_", "COMPOSE_"))}
     env.update(
         BOXEN_IMAGE=args.image,
         BOXEN_CADDY_IMAGE=args.proxy_image,
-        BOXEN_HOST=args.tailnet_host or "localhost",
+        BOXEN_HOST=args.tailnet_host or args.host,
         BOXEN_BIND_ADDRESS=bind_address,
         BOXEN_HTTPS_PORT=str(args.port),
         BOXEN_ORIGIN=origin,
         BOXEN_ANONYMOUS_ACCESS="editor",
+        BOXEN_ENV_FILE=str(root / "deploy/.env.example"),
     )
     base = [
-        "docker",
-        "compose",
-        "--env-file",
-        "/dev/null",
+        str(root / "scripts/boxen-compose"),
         "-p",
         project,
-        "-f",
-        str(root / "deploy/compose.yaml"),
     ]
     services = ["web", "worker", "caddy"]
     if args.tailnet_host:
@@ -302,6 +299,38 @@ def main():
                     )
                     assert still_editable.status_code == 201, still_editable.text
                     ai_metrics["core_after_ai_stop"] = "pass"
+                # Exercise the documented first-owner setup without logging its token.
+                token = compose(
+                    "exec", "-T", "web", "cat", "/var/lib/boxen/data/secrets/setup-token", sensitive=True
+                ).strip()
+                password = uuid.uuid4().hex
+                owner = client.post(
+                    "/api/v1/setup/owner",
+                    headers={"X-Boxen-Setup-Token": token},
+                    json={"username": "admin", "display_name": "Test administrator", "password": password},
+                )
+                assert owner.status_code == 201
+                assert owner.json()["user"]["role"] == "owner"
+                assert client.get("/api/v1/setup/status").json() == {"setup_required": False}
+                assert (
+                    client.post(
+                        "/api/v1/auth/logout", headers={"X-CSRF-Token": owner.json()["csrf_token"]}
+                    ).status_code
+                    == 204
+                )
+                # A configuration change needs recreation, as in the quick start.
+                env["BOXEN_ANONYMOUS_ACCESS"] = "off"
+                compose("up", "-d", "--no-build", "--pull", "never", "--wait", "web", "worker", "caddy")
+                client.cookies.clear()
+                client.headers.pop("X-CSRF-Token", None)
+                assert client.get("/api/v1/session").status_code == 401
+                signed_in = client.post(
+                    "/api/v1/auth/login", json={"username": "admin", "password": password}
+                )
+                assert signed_in.status_code == 200
+                assert signed_in.json()["user"]["role"] == "owner"
+                assert client.get("/api/v1/boxes/" + code).status_code == 200
+                assert client.get("/api/v1/users").status_code == 200
             print(
                 json.dumps(
                     {
@@ -311,6 +340,7 @@ def main():
                         "anonymous_crud_media_search_labels": "pass",
                         "worker": "ready",
                         "recreation_persistence_and_ca": "pass",
+                        "owner_setup_and_required_login": "pass",
                         "remote_calls": 0,
                         "real_container_ai": ai_metrics,
                     }

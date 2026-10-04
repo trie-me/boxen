@@ -4,17 +4,17 @@ Boxen stores box descriptions, photos, contents, tags, collections, accounts and
 
 ## Set up a new installation
 
-1. Follow [Deployment](/help/deployment) for Docker, or the repository README's native quickstart. Native development uses Python 3.13, Node 24, uv and pnpm 11.19.0. Build dependencies require network access or a prepared cache.
-2. Set the exact browser address in `BOXEN_ORIGIN` and choose a persistent `BOXEN_DATA_DIR`. Production requires HTTPS. For Docker, copy `deploy/.env.example` to `deploy/.env`, set the actual host/bind address, build the images and run the `init` service.
-3. Run `boxen init` once with that configuration. Keep the host's one-time setup token private. If its output was missed, read `secrets/setup-token` inside the data directory privately on the host.
-4. Open [Set up administrator](/setup). The suggested username is `admin`; choose your own display name and a unique password of at least 12 characters. There is no shared factory password. This account becomes the protected core system administrator and always signs in locally.
-5. Start the web service and worker. Sign in, open System, check component status, and create a verified backup. Optional AI and OAuth can be configured afterward.
+1. Follow the [container quick start](/help/deployment), or [native development](/help/development) if you are working on the code. The Docker build supplies Python, Node and package managers; you do not need them on the host.
+2. For Docker, copy `deploy/.env.example` to `deploy/.env` and choose the host, bind address, HTTPS port and anonymous-access mode. Compose derives the browser origin and uses persistent named volumes. For native operation, configure `BOXEN_ORIGIN` and a persistent `BOXEN_DATA_DIR` directly.
+3. Build the images, run the `init` service, then start web, worker and Caddy using the quick-start commands. Keep the one-time setup token private. Export and trust this installation's public CA certificate on your devices.
+4. Open [Set up administrator](/setup) and enter the setup token. The suggested username is `admin`; choose your own display name and a unique password of at least 12 characters. There is no shared factory password. This account becomes the protected core system administrator and always signs in locally.
+5. Sign in, open System, check component status, and create a verified backup. Optional AI and OIDC can be configured afterward.
 
 Initialization also generates private session and password-pepper keys. Keep them with the installation. Re-running initialization preserves accounts and credentials; it does not reset a password.
 
 ## Choose who can use Boxen
 
-The existing default `BOXEN_ANONYMOUS_ACCESS=editor` permits anyone reaching the installation to edit inventory. Set it to `viewer` for anonymous read-only access, or `off` to require an account. This is a host setting; restart web and worker after changing it. Anonymous access never grants administration. Create the core administrator even if you deliberately keep anonymous inventory access enabled.
+The default `BOXEN_ANONYMOUS_ACCESS=editor` permits anyone reaching the installation to edit inventory. Set it to `viewer` for anonymous read-only access, or `off` to require an account. After changing it in Docker's `.env`, run the quick start's `up -d` command to recreate affected services; `restart` alone does not apply the new value. For native operation, restart web and worker with matching configuration. Anonymous access never grants administration. Create the core administrator even if you deliberately keep anonymous inventory access enabled.
 
 Use [Users](/system/users) to add accounts with viewer, editor or owner roles. Use [Authentication](/system/authentication) to inspect sign-ins and sessions and to link identities from a configured OpenID Connect provider. See [Authentication setup](/help/authentication) and [Administration](/help/administration).
 

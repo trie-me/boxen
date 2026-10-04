@@ -35,6 +35,7 @@ tmp/
 .env.*
 !.env.example
 !deploy/.env.example
+/deploy/compose.local.yaml
 *.key
 *.pem
 *.crt

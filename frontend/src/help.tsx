@@ -7,6 +7,7 @@ import authentication from "../../docs/help/authentication.md?raw";
 import administration from "../../docs/help/administration.md?raw";
 import inventory from "../../docs/help/inventory.md?raw";
 import deployment from "../../docs/operations/deployment.md?raw";
+import development from "../../docs/operations/development.md?raw";
 import configuration from "../../docs/operations/container-storage.md?raw";
 import recovery from "../../docs/operations/recovery.md?raw";
 import models from "../../docs/operations/models.md?raw";
@@ -25,7 +26,8 @@ const topics = [
   },
   { id: "administration", title: "Users and sign-ins", source: administration },
   { id: "inventory", title: "Using your inventory", source: inventory },
-  { id: "deployment", title: "Install and deploy", source: deployment },
+  { id: "deployment", title: "Container quick start", source: deployment },
+  { id: "development", title: "Native development", source: development },
   {
     id: "container-tailnet",
     title: "Tailscale containers",

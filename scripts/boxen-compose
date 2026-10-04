@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Use the source-build Compose stack from any working directory.
+set -euo pipefail
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+# Resolve a caller-supplied relative env-file path before changing directories.
+env_file="${BOXEN_ENV_FILE:-$root/deploy/.env}"
+if [[ "$env_file" != /* ]]; then
+  env_file="$PWD/$env_file"
+fi
+if [[ ! -f "$env_file" ]]; then
+  echo "Boxen configuration not found: $env_file" >&2
+  echo "Copy deploy/.env.example to deploy/.env, then edit it for your installation." >&2
+  exit 1
+fi
+cd -- "$root"
+exec docker compose --env-file "$env_file" \
+  -f "$root/deploy/compose.yaml" \
+  -f "$root/deploy/compose.build.yaml" "$@"
