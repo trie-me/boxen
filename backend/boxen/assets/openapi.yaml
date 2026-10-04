@@ -200,6 +200,328 @@ paths:
         '422': { $ref: '#/components/responses/ValidationFailed' }
         '429': { $ref: '#/components/responses/RateLimited' }
 
+  /auth/sessions:
+    get:
+      tags:
+      - Authentication
+      operationId: listAuthSessions
+      summary: List the latest 500 user sign-in sessions (owner only).
+      parameters:
+      - name: user_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuthSessionView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /auth/sessions/{session_id}:
+    delete:
+      tags:
+      - Authentication
+      operationId: revokeAuthSession
+      summary: Revoke one session after recent owner sign-in.
+      parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: Operation completed.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /users/{user_id}/revoke-sessions:
+    post:
+      tags:
+      - Authentication
+      operationId: revokeUserSessions
+      summary: Revoke all sessions for this user after recent owner sign-in.
+      parameters:
+      - name: user_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '200':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - revoked
+                properties:
+                  revoked:
+                    type: integer
+                    minimum: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /auth/events:
+    get:
+      tags:
+      - Authentication
+      operationId: listAuthEvents
+      summary: List recent authentication audit events (owner only).
+      parameters:
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 100
+      responses:
+        '200':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuthEventView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /auth/providers:
+    get:
+      tags:
+      - Authentication
+      operationId: listAuthProviders
+      summary: List enabled OpenID Connect sign-in providers.
+      security: []
+      responses:
+        '200':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuthProviderView'
+  /auth/oidc/{provider_id}/start:
+    post:
+      tags:
+      - Authentication
+      operationId: startOIDCSignIn
+      summary: Begin browser-bound authorization-code sign-in with PKCE.
+      security: []
+      parameters:
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+          pattern: ^[a-z][a-z0-9_-]{0,39}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: []
+              properties: {}
+      responses:
+        '200':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - authorization_url
+                properties:
+                  authorization_url:
+                    type: string
+  /auth/oidc/{provider_id}/callback:
+    get:
+      tags:
+      - Authentication
+      operationId: completeOIDCSignIn
+      summary: Validate a one-time provider response and redirect to Boxen.
+      security: []
+      parameters:
+      - name: provider_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: code
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: state
+        in: query
+        required: false
+        schema:
+          type: string
+      - name: error
+        in: query
+        required: false
+        schema:
+          type: string
+      responses:
+        '302':
+          description: Operation completed.
+  /auth/provider-status:
+    get:
+      tags:
+      - Authentication
+      operationId: listAuthProviderStatus
+      summary: Inspect configured sign-in providers (owner only).
+      responses:
+        '200':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuthProviderStatusView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /auth/identities:
+    get:
+      tags:
+      - Authentication
+      operationId: listAuthIdentities
+      summary: List explicit provider subject bindings (owner only).
+      parameters:
+      - name: user_id
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                - items
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuthIdentityView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags:
+      - Authentication
+      operationId: linkAuthIdentity
+      summary: Bind a provider subject to an existing local user after recent owner
+        sign-in.
+      parameters:
+      - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+              - user_id
+              - provider_id
+              - subject
+              properties:
+                user_id:
+                  $ref: '#/components/schemas/Uuid'
+                provider_id:
+                  type: string
+                subject:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+      responses:
+        '201':
+          description: Operation completed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthIdentityView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /auth/identities/{identity_id}:
+    delete:
+      tags:
+      - Authentication
+      operationId: unlinkAuthIdentity
+      summary: Unlink an identity and revoke the user sessions after recent owner sign-in.
+      parameters:
+      - name: identity_id
+        in: path
+        required: true
+        schema:
+          $ref: '#/components/schemas/Uuid'
+      - $ref: '#/components/parameters/CsrfToken'
+      responses:
+        '204':
+          description: Operation completed.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   /users:
     get:
       tags: [Users]
@@ -1244,6 +1566,35 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '422': { $ref: '#/components/responses/ValidationFailed' }
 
+  /labels.pdf:
+    post:
+      tags: [Labels]
+      operationId: renderLabelSheet
+      summary: Render one label per selected box on US Letter sheets. Editor or owner.
+      description: Read-only PDF generation. Pin order is preserved; collections use name/code order and include archived members. No partial output for missing boxes or empty collections. Maximum 500 labels.
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LabelSheetRequest' }
+      responses:
+        '200':
+          description: Deterministic Letter PDF, ten 4 x 2-inch labels per page.
+          headers:
+            ETag: { $ref: '#/components/headers/ETag' }
+            Content-Disposition:
+              schema: { type: string }
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationFailed' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
   /health/live:
     get:
       tags: [Operations]
@@ -1754,10 +2105,12 @@ components:
     UserView:
       type: object
       additionalProperties: false
-      required: [id, username, display_name, role, status, version, created_at, updated_at]
+      required: [id, username, display_name, role, status, version, created_at, updated_at, is_system_admin, local_password]
       properties:
         id: { $ref: '#/components/schemas/Uuid' }
         username: { type: string }
+        is_system_admin: { type: boolean }
+        local_password: { type: boolean }
         display_name: { type: string }
         role: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/UserStatus' }
@@ -1782,6 +2135,120 @@ components:
         role: { $ref: '#/components/schemas/Role' }
         status: { $ref: '#/components/schemas/UserStatus' }
         password: { type: string, minLength: 12, maxLength: 1024 }
+
+    AuthSessionView:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - user_id
+      - username
+      - method
+      - created_at
+      - last_seen_at
+      - expires_at
+      - revoked_at
+      - active
+      - current
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        username: &id001
+          type: string
+        method: *id001
+        created_at:
+          $ref: '#/components/schemas/DateTime'
+        last_seen_at:
+          $ref: '#/components/schemas/DateTime'
+        expires_at:
+          $ref: '#/components/schemas/DateTime'
+        revoked_at: &id002
+          type:
+          - string
+          - 'null'
+        active:
+          type: boolean
+        current:
+          type: boolean
+    AuthEventView:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - occurred_at
+      - user_id
+      - username
+      - action
+      - method
+      properties:
+        id:
+          type: integer
+        occurred_at:
+          $ref: '#/components/schemas/DateTime'
+        user_id: *id002
+        username: *id002
+        action: *id001
+        method: *id002
+
+    AuthProviderView:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - label
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+    AuthProviderStatusView:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - label
+      - issuer
+      - client_id
+      - configured
+      - redirect_uri
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        issuer:
+          type: string
+        client_id:
+          type: string
+        configured:
+          type: boolean
+        redirect_uri:
+          type: string
+    AuthIdentityView:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - user_id
+      - provider_id
+      - issuer
+      - subject
+      - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/Uuid'
+        user_id:
+          $ref: '#/components/schemas/Uuid'
+        provider_id:
+          type: string
+        issuer:
+          type: string
+        subject:
+          type: string
+        created_at:
+          $ref: '#/components/schemas/DateTime'
 
     TagNames:
       type: array
@@ -2370,6 +2837,29 @@ components:
         input_kind: { type: string, enum: [box_code, qr_payload, local_url] }
         canonical_payload: { type: string, pattern: '^boxen:v1:BX-' }
         box: { $ref: '#/components/schemas/BoxSummary' }
+    LabelSheetRequest:
+      type: object
+      additionalProperties: false
+      oneOf:
+        - required: [box_codes]
+        - required: [collection_id]
+      properties:
+        box_codes:
+          type: array
+          minItems: 1
+          maxItems: 500
+          uniqueItems: true
+          description: One label per code, in the supplied order.
+          items: { $ref: '#/components/schemas/BoxCode' }
+        collection_id: { $ref: '#/components/schemas/Uuid' }
+        start_position:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 1
+          description: First unused position on the first sheet; left to right, top to bottom.
+        offset_x_mm: { type: number, minimum: -3, maximum: 3, default: 0, description: 'Positive moves right; applied to all sheets.' }
+        offset_y_mm: { type: number, minimum: -3, maximum: 3, default: 0, description: 'Positive moves down; applied to all sheets.' }
     LabelProfileView:
       type: object
       additionalProperties: false

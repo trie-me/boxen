@@ -40,6 +40,8 @@ def v1_database(settings, *, legacy=False):
         (settings.data_dir / directory).mkdir(parents=True, exist_ok=True)
     settings.session_key_file.write_bytes(b"test-only-session-identity-000001")
     settings.session_key_file.chmod(0o600)
+    settings.password_pepper_file.write_bytes(b"p" * 32)
+    settings.password_pepper_file.chmod(0o600)
     original = settings.data_dir / "media/originals/fixture.png"
     original.write_bytes(b"test-only-original-photo-bytes")
     with sqlite3.connect(settings.database_path) as db:
@@ -137,7 +139,7 @@ def test_historical_schema_and_migration_bytes_are_immutable():
     ).read_bytes()
 
 
-def test_fresh_initialization_uses_exact_two_revision_history(settings):
+def test_fresh_initialization_uses_exact_revision_history(settings):
     assert initialize(settings)
     database = Database(settings)
     try:
@@ -175,6 +177,10 @@ def test_upgrade_rebuilds_complete_search_preserving_identity_and_inventory(sett
     v1_database(settings, legacy=legacy)
     secret = settings.session_key_file.read_bytes()
     with sqlite3.connect(settings.database_path) as db:
+        original_columns = {
+            table: ",".join(row[1] for row in db.execute(f"PRAGMA table_info({table})"))
+            for table in ("users", "sessions", "boxes", "inventory_items", "box_images", "app_settings")
+        }
         before = {
             table: db.execute(f"SELECT * FROM {table}").fetchall()
             for table in (
@@ -191,7 +197,8 @@ def test_upgrade_rebuilds_complete_search_preserving_identity_and_inventory(sett
     assert settings.session_key_file.read_bytes() == secret
     with sqlite3.connect(settings.database_path) as db:
         for table, rows in before.items():
-            assert db.execute(f"SELECT * FROM {table}").fetchall() == rows
+            clause = " WHERE key != 'password_pepper_fingerprint'" if table == "app_settings" else ""
+            assert db.execute(f"SELECT {original_columns[table]} FROM {table}{clause}").fetchall() == rows
         assert db.execute("SELECT applied_at FROM schema_migrations WHERE version='0001'").fetchone() == (AT,)
         assert db.execute("SELECT * FROM box_search WHERE box_id='box'").fetchone() == (
             "box",
@@ -379,13 +386,20 @@ def test_relationship_cascades_and_reverse_indexes(settings, deleted):
         )
 
 
-@pytest.mark.parametrize("version,legacy", [("0001", False), ("0001", True), ("0002", False)])
+@pytest.mark.parametrize(
+    "version,legacy", [("0001", False), ("0001", True), ("0002", False), ("0003", False)]
+)
 def test_backup_versions_restore_offline_without_rewriting_old_artifacts(settings, version, legacy):
     v1_database(settings, legacy=legacy)
     if version == "0002":
+        with sqlite3.connect(settings.database_path) as db:
+            db.executescript((ASSETS / "migrations/0002_organization.sql").read_text())
+            db.execute("INSERT INTO schema_migrations VALUES (?,?,?)", (*migration_history()[1], AT))
+            db.execute("UPDATE alembic_version SET version_num='0002'")
+    elif version == "0003":
         initialize(settings)
     database = Database(settings)
-    if version == "0002":
+    if version != "0001":
         add_organization(database)
     backups = Backups(settings, database)
     row = {"relative_path": "version-fixture"}
@@ -428,8 +442,8 @@ def test_backup_versions_restore_offline_without_rewriting_old_artifacts(setting
             session = repo.find("sessions")[0]
             assert session["user_id"] == "user" and session["token_hash"] == "1" * 64
             assert session["revoked_at"] is not None
-            assert len(repo.find("tags")) == (1 if version == "0002" else 0)
-            assert len(repo.find("collection_boxes")) == (1 if version == "0002" else 0)
+            assert len(repo.find("tags")) == (1 if version != "0001" else 0)
+            assert len(repo.find("collection_boxes")) == (1 if version != "0001" else 0)
             assert (
                 repo.execute("SELECT item_names FROM box_search WHERE box_id='box'").scalar()
                 == "Adjustable wrench\nSpare washers"

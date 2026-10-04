@@ -1,0 +1,16 @@
+# Optional OIDC: host-managed configuration plus outbound HTTPS from web only.
+# BOXEN_OAUTH_CONFIG_DIR contains providers.json and referenced private secrets.
+services:
+  web:
+    environment:
+      BOXEN_OAUTH_PROVIDERS_FILE: /run/boxen-oauth/providers.json
+    volumes:
+      - type: bind
+        source: ${BOXEN_OAUTH_CONFIG_DIR:?Set an absolute private OAuth configuration directory}
+        target: /run/boxen-oauth
+        read_only: true
+        bind:
+          create_host_path: false
+    networks: [private, oauth-egress]
+networks:
+  oauth-egress: {}

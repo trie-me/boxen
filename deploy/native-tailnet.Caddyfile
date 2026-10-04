@@ -1,0 +1,88 @@
+{
+	admin off
+	persist_config off
+	auto_https disable_redirects
+	skip_install_trust
+	storage file_system {$LOCAL_TLS_STATE}
+	pki {
+		ca local {
+			name "Boxen local network"
+			root_cn "Boxen LAN Root CA"
+			intermediate_cn "Boxen LAN Intermediate CA"
+		}
+	}
+	servers {
+		protocols h1 h2
+	}
+}
+
+(public_trust) {
+	handle /trust/boxen-local-ca.crt {
+		root * {$LOCAL_TLS_PUBLIC}
+		header Content-Type application/x-x509-ca-cert
+		header Content-Disposition "attachment; filename=boxen-local-ca.crt"
+		header Cache-Control no-store
+		rewrite * /boxen-local-ca.crt
+		file_server
+	}
+	handle /trust/ {
+		root * {$LOCAL_TLS_PUBLIC}
+		header Cache-Control no-store
+		header X-Content-Type-Options nosniff
+		header Content-Security-Policy "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'"
+		rewrite * /index.html
+		file_server
+	}
+	handle /trust {
+		redir /trust/ 302
+	}
+	handle /trust/* {
+		respond "Not found" 404
+	}
+}
+
+# Tailscale-only application ingress. Keep the application backend on loopback.
+https://{$TAILNET_HOST}:8443 {
+	bind {$TAILNET_BIND}
+	tls internal
+	encode zstd gzip
+	request_body {
+		max_size 26MB
+	}
+	import public_trust
+	handle {
+		reverse_proxy {$LOCAL_TLS_UPSTREAM:127.0.0.1:8000}
+	}
+}
+
+http://{$TAILNET_HOST}:8000 {
+	bind {$TAILNET_BIND}
+	import public_trust
+	handle {
+		@read method GET HEAD
+		redir @read https://{$TAILNET_HOST}:8443{uri} 302
+		respond "Boxen has moved to HTTPS. Reload the secure address before saving." 400
+	}
+}
+
+# Existing LAN bookmarks lead to the new canonical origin; no cross-origin writes.
+https://{$LOCAL_TLS_HOST}:8443 {
+	bind {$LOCAL_TLS_HOST}
+	tls internal
+	import public_trust
+	handle {
+		@read method GET HEAD
+		redir @read https://{$TAILNET_HOST}:8443{uri} 302
+		respond "Boxen has moved to its Tailscale address. Reload before saving." 400
+	}
+}
+
+http://{$LOCAL_TLS_HOST}:8000 {
+	bind {$LOCAL_TLS_HOST}
+	import public_trust
+	handle {
+		@read method GET HEAD
+		redir @read https://{$TAILNET_HOST}:8443{uri} 302
+		respond "Boxen has moved to its Tailscale address. Reload before saving." 400
+	}
+}

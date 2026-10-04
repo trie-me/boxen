@@ -1,0 +1,115 @@
+.help-layout {
+  max-width: 1480px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-bottom: 24px;
+  flex-wrap: wrap;
+}
+.help-header .brand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.help-body {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+.help-navigation {
+  position: sticky;
+  top: 20px;
+}
+.help-navigation label {
+  display: block;
+  margin-bottom: 8px;
+}
+.help-navigation input {
+  width: 100%;
+  min-width: 0;
+}
+.help-navigation nav {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+}
+.help-navigation nav a {
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+.help-navigation nav a[aria-current="page"] {
+  border-color: currentColor;
+  background: rgba(69, 226, 205, 0.06);
+}
+.help-article {
+  min-width: 0;
+  padding: 32px;
+}
+.help-article .markdown {
+  overflow-wrap: anywhere;
+  line-height: 1.75;
+}
+.help-article h1 {
+  font-size: clamp(1.8rem, 4vw, 2.7rem);
+  line-height: 1.15;
+}
+.help-article h2 {
+  margin-top: 2.2rem;
+}
+.help-article pre {
+  overflow: auto;
+  max-width: 100%;
+  padding: 16px;
+  background: #0a1019;
+  border-radius: 6px;
+  white-space: pre;
+}
+.help-article table {
+  display: block;
+  max-width: 100%;
+  overflow: auto;
+  border-collapse: collapse;
+}
+.help-article th,
+.help-article td {
+  padding: 10px;
+  border-bottom: 1px solid #324353;
+  text-align: left;
+}
+.help-article li {
+  margin-bottom: 8px;
+}
+.help-article :target {
+  scroll-margin-top: 20px;
+}
+@media (max-width: 760px) {
+  .help-layout {
+    padding: 16px;
+  }
+  .help-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .help-navigation {
+    position: static;
+  }
+  .help-navigation nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .help-navigation nav a {
+    font-size: 0.85rem;
+  }
+  .help-article {
+    padding: 20px 16px;
+  }
+  .help-header .actions {
+    flex-wrap: wrap;
+  }
+}

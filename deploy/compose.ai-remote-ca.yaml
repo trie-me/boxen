@@ -1,0 +1,15 @@
+# Optional private CA bundle; add after compose.ai-remote.yaml.
+# File must be readable by UID 10001. The normal system CA store is used when
+# this overlay is absent; never set BOXEN_AI_CA_FILE to an empty string.
+x-ca: &ca
+  environment:
+    BOXEN_AI_CA_FILE: /run/secrets/boxen_ai_ca
+  secrets: [boxen_ai_ca]
+services:
+  web:
+    <<: *ca
+  worker:
+    <<: *ca
+secrets:
+  boxen_ai_ca:
+    file: ${BOXEN_AI_CA_SOURCE:?Set BOXEN_AI_CA_SOURCE to the absolute PEM CA bundle path}

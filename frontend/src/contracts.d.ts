@@ -138,6 +138,177 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/auth/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List the latest 500 user sign-in sessions (owner only). */
+    get: operations["listAuthSessions"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/sessions/{session_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke one session after recent owner sign-in. */
+    delete: operations["revokeAuthSession"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/users/{user_id}/revoke-sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Revoke all sessions for this user after recent owner sign-in. */
+    post: operations["revokeUserSessions"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/events": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List recent authentication audit events (owner only). */
+    get: operations["listAuthEvents"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/providers": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List enabled OpenID Connect sign-in providers. */
+    get: operations["listAuthProviders"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/oidc/{provider_id}/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Begin browser-bound authorization-code sign-in with PKCE. */
+    post: operations["startOIDCSignIn"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/oidc/{provider_id}/callback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Validate a one-time provider response and redirect to Boxen. */
+    get: operations["completeOIDCSignIn"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/provider-status": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Inspect configured sign-in providers (owner only). */
+    get: operations["listAuthProviderStatus"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/identities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List explicit provider subject bindings (owner only). */
+    get: operations["listAuthIdentities"];
+    put?: never;
+    /** Bind a provider subject to an existing local user after recent owner sign-in. */
+    post: operations["linkAuthIdentity"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/auth/identities/{identity_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Unlink an identity and revoke the user sessions after recent owner sign-in. */
+    delete: operations["unlinkAuthIdentity"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/users": {
     parameters: {
       query?: never;
@@ -679,6 +850,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/labels.pdf": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Render one label per selected box on US Letter sheets. Editor or owner.
+     * @description Read-only PDF generation. Pin order is preserved; collections use name/code order and include archived members. No partial output for missing boxes or empty collections. Maximum 500 labels.
+     */
+    post: operations["renderLabelSheet"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/health/live": {
     parameters: {
       query?: never;
@@ -947,6 +1138,8 @@ export interface components {
     UserView: {
       id: components["schemas"]["Uuid"];
       username: string;
+      is_system_admin: boolean;
+      local_password: boolean;
       display_name: string;
       role: components["schemas"]["Role"];
       status: components["schemas"]["UserStatus"];
@@ -965,6 +1158,46 @@ export interface components {
       role?: components["schemas"]["Role"];
       status?: components["schemas"]["UserStatus"];
       password?: string;
+    };
+    AuthSessionView: {
+      id: components["schemas"]["Uuid"];
+      user_id: components["schemas"]["Uuid"];
+      username: string;
+      method: string;
+      created_at: components["schemas"]["DateTime"];
+      last_seen_at: components["schemas"]["DateTime"];
+      expires_at: components["schemas"]["DateTime"];
+      revoked_at: string | null;
+      active: boolean;
+      current: boolean;
+    };
+    AuthEventView: {
+      id: number;
+      occurred_at: components["schemas"]["DateTime"];
+      user_id: string | null;
+      username: string | null;
+      action: string;
+      method: string | null;
+    };
+    AuthProviderView: {
+      id: string;
+      label: string;
+    };
+    AuthProviderStatusView: {
+      id: string;
+      label: string;
+      issuer: string;
+      client_id: string;
+      configured: boolean;
+      redirect_uri: string;
+    };
+    AuthIdentityView: {
+      id: components["schemas"]["Uuid"];
+      user_id: components["schemas"]["Uuid"];
+      provider_id: string;
+      issuer: string;
+      subject: string;
+      created_at: components["schemas"]["DateTime"];
     };
     /** @description Names are trimmed and NFC normalized; casefold-equivalent names reuse the first spelling. Empty clears tags. */
     TagNames: string[];
@@ -1346,6 +1579,26 @@ export interface components {
       canonical_payload: string;
       box: components["schemas"]["BoxSummary"];
     };
+    LabelSheetRequest: {
+      /** @description One label per code, in the supplied order. */
+      box_codes?: components["schemas"]["BoxCode"][];
+      collection_id?: components["schemas"]["Uuid"];
+      /**
+       * @description First unused position on the first sheet; left to right, top to bottom.
+       * @default 1
+       */
+      start_position: number;
+      /**
+       * @description Positive moves right; applied to all sheets.
+       * @default 0
+       */
+      offset_x_mm: number;
+      /**
+       * @description Positive moves down; applied to all sheets.
+       * @default 0
+       */
+      offset_y_mm: number;
+    } & (unknown | unknown);
     LabelProfileView: {
       key: string;
       version: number;
@@ -1753,6 +2006,290 @@ export interface operations {
       403: components["responses"]["Forbidden"];
       422: components["responses"]["ValidationFailed"];
       429: components["responses"]["RateLimited"];
+    };
+  };
+  listAuthSessions: {
+    parameters: {
+      query?: {
+        user_id?: components["schemas"]["Uuid"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: components["schemas"]["AuthSessionView"][];
+          };
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+    };
+  };
+  revokeAuthSession: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-CSRF-Token": components["parameters"]["CsrfToken"];
+      };
+      path: {
+        session_id: components["schemas"]["Uuid"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+    };
+  };
+  revokeUserSessions: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-CSRF-Token": components["parameters"]["CsrfToken"];
+      };
+      path: {
+        user_id: components["schemas"]["Uuid"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            revoked: number;
+          };
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+    };
+  };
+  listAuthEvents: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: components["schemas"]["AuthEventView"][];
+          };
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+    };
+  };
+  listAuthProviders: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: components["schemas"]["AuthProviderView"][];
+          };
+        };
+      };
+    };
+  };
+  startOIDCSignIn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": Record<string, never>;
+      };
+    };
+    responses: {
+      /** @description Operation completed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            authorization_url: string;
+          };
+        };
+      };
+    };
+  };
+  completeOIDCSignIn: {
+    parameters: {
+      query?: {
+        code?: string;
+        state?: string;
+        error?: string;
+      };
+      header?: never;
+      path: {
+        provider_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  listAuthProviderStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: components["schemas"]["AuthProviderStatusView"][];
+          };
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+    };
+  };
+  listAuthIdentities: {
+    parameters: {
+      query?: {
+        user_id?: components["schemas"]["Uuid"];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            items: components["schemas"]["AuthIdentityView"][];
+          };
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+    };
+  };
+  linkAuthIdentity: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-CSRF-Token": components["parameters"]["CsrfToken"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": {
+          user_id: components["schemas"]["Uuid"];
+          provider_id: string;
+          subject: string;
+        };
+      };
+    };
+    responses: {
+      /** @description Operation completed. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AuthIdentityView"];
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+    };
+  };
+  unlinkAuthIdentity: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-CSRF-Token": components["parameters"]["CsrfToken"];
+      };
+      path: {
+        identity_id: components["schemas"]["Uuid"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Operation completed. */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
     };
   };
   listUsers: {
@@ -3060,6 +3597,39 @@ export interface operations {
       403: components["responses"]["Forbidden"];
       404: components["responses"]["NotFound"];
       422: components["responses"]["ValidationFailed"];
+    };
+  };
+  renderLabelSheet: {
+    parameters: {
+      query?: never;
+      header: {
+        "X-CSRF-Token": components["parameters"]["CsrfToken"];
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LabelSheetRequest"];
+      };
+    };
+    responses: {
+      /** @description Deterministic Letter PDF, ten 4 x 2-inch labels per page. */
+      200: {
+        headers: {
+          ETag: components["headers"]["ETag"];
+          "Content-Disposition"?: string;
+          [name: string]: unknown;
+        };
+        content: {
+          "application/pdf": string;
+        };
+      };
+      401: components["responses"]["Unauthorized"];
+      403: components["responses"]["Forbidden"];
+      404: components["responses"]["NotFound"];
+      422: components["responses"]["ValidationFailed"];
+      429: components["responses"]["RateLimited"];
     };
   };
   getLiveness: {

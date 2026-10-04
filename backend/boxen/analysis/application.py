@@ -116,7 +116,7 @@ class Analysis:
         require(
             profile is not None,
             "analysis.unavailable",
-            "Local AI is not installed or its profile is invalid.",
+            "AI is not configured or its profile is invalid.",
             503,
         )
         require(
@@ -337,7 +337,7 @@ class Analysis:
                 "The photo failed its integrity check.",
             )
             if not self.vision.profile or self.vision.profile["profile_id"] != job["model_profile"]:
-                raise DomainError("ai.profile_invalid", "The requested local model profile is unavailable.")
+                raise DomainError("ai.profile_invalid", "The requested AI model profile is unavailable.")
             if job["prompt_version"] != PROMPT_VERSION:
                 raise DomainError(
                     "ai.profile_changed", "The analysis profile changed. Analyze this photo again."
@@ -393,6 +393,8 @@ class Analysis:
                 repo.set_setting(
                     "run-provenance:" + run_id,
                     {
+                        "ai_mode": self.vision.settings.ai_mode,
+                        "artifact_verification": self.vision.artifact_verification,
                         "prompt_sha256": hashlib.sha256(PROMPT.encode()).hexdigest(),
                         "schema_sha256": self.vision.schema_hash,
                         "generation_schema_sha256": GENERATION_SCHEMA_HASH,

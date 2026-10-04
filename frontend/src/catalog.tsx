@@ -1,3 +1,4 @@
+import { PinLabel, PrintListLink, usePrintList } from "./print-list";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import {
@@ -122,6 +123,7 @@ export function Home() {
 }
 
 export function Boxes() {
+  const printList = usePrintList();
   const session = useSession();
   const [params, setParams] = useSearchParams();
   const lifecycle = params.get("lifecycle") ?? "active",
@@ -177,6 +179,24 @@ export function Boxes() {
         </Field>
       </div>
       <OrganizationFilters params={params} onChange={setParams} />
+      {session.user.role !== "viewer" && (
+        <div className="print-toolbar">
+          <PrintListLink />
+          <button
+            disabled={!boxes.data?.pages.some((p) => p.items.length)}
+            onClick={() =>
+              printList.add(
+                boxes.data?.pages.flatMap((p) =>
+                  p.items.map((box) => box.code),
+                ) ?? [],
+              )
+            }
+          >
+            Pin all loaded boxes
+          </button>
+          {printList.notice && <span role="status">{printList.notice}</span>}
+        </div>
+      )}
       <ErrorNote error={boxes.error} />
       {boxes.isPending ? (
         <Loading />
@@ -471,6 +491,7 @@ export function BoxDetail() {
           </Link>
         )}
       </PageHead>
+      <PinLabel box={b} />
       <Code code={b.code} />
       <OrganizationBadges tags={b.tags} collections={b.collections} />
       <div className="detail-layout">
@@ -681,6 +702,7 @@ export function Search() {
                     <Highlighted text={match.snippet} ranges={match.ranges} />
                   </p>
                 ))}
+                <PinLabel box={r.box} />
                 {r.matching_items.length > 0 && (
                   <small>
                     Matching items:{" "}
@@ -735,7 +757,10 @@ export function Labels() {
   const url = `/api/v1/boxes/${boxCode}/label.pdf?profile=${profile}`;
   return (
     <>
-      <PageHead title="Print a box label" eyebrow="FROM DIGITAL TO PHYSICAL" />
+      <PageHead title="Print a box label" eyebrow="FROM DIGITAL TO PHYSICAL">
+        <PrintListLink />
+      </PageHead>
+      {box.data && <PinLabel box={box.data} />}
       <ErrorNote error={profiles.error ?? box.error} />
       <div className="panel">
         <Field label="Label size">

@@ -1,0 +1,24 @@
+# Explicit opt-in: web and worker can send analysis requests to this endpoint.
+# Choose this overlay OR compose.ai-local.yaml, never both. No weights required.
+x-remote-ai: &remote-ai
+  environment:
+    BOXEN_AI_MODE: remote
+    BOXEN_AI_BASE_URL: ${BOXEN_AI_BASE_URL:?Set BOXEN_AI_BASE_URL to the explicit remote HTTPS endpoint}
+    BOXEN_AI_PROFILE: ${BOXEN_AI_PROFILE:?Set BOXEN_AI_PROFILE to a provisioned remote profile}
+    BOXEN_AI_MODELS_DIR: /models
+    BOXEN_AI_ALLOW_INSECURE_HTTP: ${BOXEN_AI_ALLOW_INSECURE_HTTP:-false}
+  volumes:
+    - type: bind
+      source: ${BOXEN_AI_PROFILES_DIR:?Set BOXEN_AI_PROFILES_DIR to the absolute remote profile metadata directory}
+      target: /models
+      read_only: true
+      bind:
+        create_host_path: false
+  networks: [private, egress]
+services:
+  web:
+    <<: *remote-ai
+  worker:
+    <<: *remote-ai
+networks:
+  egress: {}

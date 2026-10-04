@@ -55,6 +55,8 @@ describe("HTTP anonymous editor requests", () => {
       expires_at: "2030-01-01T00:00:00Z",
       capabilities: [],
       user: {
+        is_system_admin: false,
+        local_password: true,
         id: "00000000-0000-4000-8000-000000000001",
         username: "anonymous",
         display_name: "Local access",

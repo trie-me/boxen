@@ -1,0 +1,129 @@
+.provider-sign-in:empty {
+  display: none;
+}
+.provider-sign-in {
+  display: grid;
+  gap: 12px;
+  margin-top: 20px;
+}
+.provider-sign-in button {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.auth > a {
+  display: inline-block;
+  margin: 4px 12px 4px 0;
+}
+.auth-section-links {
+  margin-bottom: 24px;
+}
+.auth-admin .panel {
+  scroll-margin-top: 24px;
+}
+.auth-admin h2 {
+  font-size: 22px;
+}
+.auth-admin h3 {
+  margin: 0 0 8px;
+  font-size: 17px;
+  overflow-wrap: anywhere;
+}
+.auth-filter select {
+  max-width: 560px;
+}
+.auth-record {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 22px 0;
+  border-top: 1px solid var(--bx-color-border);
+}
+.auth-record:last-child {
+  padding-bottom: 0;
+}
+.auth-record > button {
+  flex-shrink: 0;
+}
+.auth-record-body {
+  min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+.auth-record h3 .badge {
+  margin-left: 8px;
+}
+.auth-dates,
+.auth-provider-details {
+  margin: 16px 0 0;
+  display: grid;
+  gap: 14px 24px;
+  font-size: 13px;
+}
+.auth-dates {
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+}
+.auth-provider-details > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+}
+.auth-dates dt,
+.auth-provider-details dt {
+  color: var(--bx-color-text-muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.auth-dates dd,
+.auth-provider-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.auth-event-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.auth-event-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--bx-color-border);
+  font-size: 13px;
+}
+.auth-event-list li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.auth-event-list span {
+  display: block;
+  margin-top: 4px;
+  color: var(--bx-color-text-muted);
+}
+.auth-event-list time {
+  flex-shrink: 0;
+  color: var(--bx-color-text-muted);
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .auth-admin .section-head {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .auth-admin .section-head h2 {
+    width: 100%;
+  }
+  .auth-record,
+  .auth-event-list li {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .auth-record > button {
+    width: 100%;
+  }
+  .auth-provider-details > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+}

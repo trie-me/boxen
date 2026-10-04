@@ -16,6 +16,8 @@ from sqlalchemy.engine import Connection
 TABLES = {
     "users",
     "sessions",
+    "external_identities",
+    "oidc_transactions",
     "app_settings",
     "idempotency_records",
     "boxes",
@@ -204,7 +206,32 @@ def initialize(settings: Settings) -> str | None:
                 setup_path = settings.data_dir / "secrets/setup-token"
                 token = None
                 with database.transaction(write=True) as repo:
-                    if not repo.find("users") and not repo.setting("setup_token_hash"):
+                    assert settings.password_pepper_file is not None
+                    if not settings.password_pepper_file.exists():
+                        if repo.execute(
+                            "SELECT 1 FROM users WHERE password_hash LIKE '$boxen-pepper-v1$%' LIMIT 1"
+                        ).scalar() or repo.setting("password_pepper_fingerprint"):
+                            raise RuntimeError(
+                                "Password pepper is missing. Restore the original pepper file; "
+                                "generating a replacement would lock out existing users."
+                            )
+                        settings.password_pepper_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                        with settings.password_pepper_file.open("xb") as pepper_file:
+                            os.fchmod(pepper_file.fileno(), 0o600)
+                            pepper_file.write(secrets.token_bytes(32))
+                            pepper_file.flush()
+                            os.fsync(pepper_file.fileno())
+                    fingerprint = hashlib.sha256(settings.password_pepper()).hexdigest()
+                    expected = repo.setting("password_pepper_fingerprint")
+                    if expected and not secrets.compare_digest(expected, fingerprint):
+                        raise RuntimeError(
+                            "Password pepper does not match this installation. Restore its original file."
+                        )
+                    if expected is None:
+                        repo.set_setting("password_pepper_fingerprint", fingerprint)
+                    if not repo.execute(
+                        "SELECT 1 FROM users WHERE id != '00000000-0000-4000-8000-000000000001' LIMIT 1"
+                    ).scalar() and not repo.setting("setup_token_hash"):
                         token = secrets.token_urlsafe(32)
                         setup_path.write_text(token)
                         setup_path.chmod(0o600)

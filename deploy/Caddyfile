@@ -4,12 +4,13 @@
     skip_install_trust
 }
 
+# Container TLS port is fixed; Compose maps the chosen public port to 8443.
+# BOXEN_HOST is also used to derive the app's exact browser origin.
 https://{$BOXEN_HOST:localhost}:8443 {
     tls internal
     encode zstd gzip
     request_body {
         max_size 26MB
     }
-    header Strict-Transport-Security "max-age=31536000"
     reverse_proxy web:8000
 }

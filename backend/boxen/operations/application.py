@@ -84,7 +84,9 @@ class Operations:
                     {
                         "status": "unavailable",
                         "code": "ai.not_installed",
-                        "message": "Local AI is not installed.",
+                        "message": "Remote AI is not configured."
+                        if self.settings.ai_mode == "remote"
+                        else "Local AI is not installed.",
                     },
                 ),
                 "checked_at": at,
@@ -128,7 +130,7 @@ class Operations:
         return {
             "application_version": __version__,
             "schema_version": CURRENT_SCHEMA_VERSION,
-            "runtime_offline": True,
+            "runtime_offline": self.settings.ai_mode == "local",
             "components": components,
             "limits": limits,
         }

@@ -2,6 +2,11 @@
 
 Boxen is a local box inventory app: photographs, Markdown descriptions, searchable contents, QR lookup and printable PDF labels. SQLite and local media hold your data. Optional local vision AI proposes items for human review; the core app works without a model or internet connection after installation.
 
+Deployment addresses, host paths and Tailscale names in this repository are
+examples. Replace them with your installation's private settings. Inventory,
+credentials, certificates, model weights and local deployment files are excluded
+from the repository; certificate fingerprints must come from your own host.
+
 Photos collectively represent the items assigned to a box: packed contents, staged items, close-ups or reference views all work. The container need not appear. **Analyze all photos** queues independent analyses into one shared review. Review the item chips, remove unwanted suggestions with ×, add missing items, then **Accept items** to save the edited set together. Tap a chip for quantity/source details or to link repeated views to an existing item without counting its quantity twice. Completed photo analyses are remembered across navigation and devices; **Analyze again** requires confirmation. See the [AI repair evidence](docs/verification/ai-photo-collection.md) for actual timings and limitations and [chip-set design](docs/system-design/adrs/0007-chip-set-review.md) for review semantics.
 
 Anonymous **editing** is enabled by default: create boxes, add contents and photos, and print labels without creating an account. Set `BOXEN_ANONYMOUS_ACCESS=viewer` for read-only access or `off` to require accounts. Administrative functions, backups, user management and irreversible purge require a local owner. Anyone who can reach the server gets the selected anonymous permissions; use a trusted network, never public port forwarding.
@@ -15,6 +20,21 @@ merged or totaled; unknown quantities remain unknown. Removing membership or
 deleting a collection preserves the boxes, photos and inventory. Search includes
 tags and collection names, and both Your boxes and Search have exact filters.
 
+Use **Pin label for printing** on box cards, search results or box details to
+build a print list. Open **Print list (N)** in the header to remove labels and
+prepare one PDF. Pins are saved in this browser for the current account;
+**Pin all loaded boxes** adds the currently loaded results without duplicates.
+A collection’s **Print collection labels** action prints every member, including
+archived boxes, without changing your pins. Each label includes the box's current
+collection names when it has any.
+Multiple collections appear alphabetically beneath the box name; long lists
+are shortened with an ellipsis to preserve QR and code readability.
+Batch PDFs use US Letter,
+4 × 2-inch labels in a 2 × 5 grid (Avery 5163/8163 layout), up to 500 labels per
+PDF. Choose a starting position for a partly used sheet and adjust alignment
+if needed. Print at **100% / actual size**, portrait and single-sided; test on
+plain paper against your stock first. See [batch printing details and verification](docs/verification/batch-label-printing.md).
+
 Search also offers contextual typeahead. Enter `BX-` and at least two code
 characters (for example `BX-7K`) for matching boxes. Other text of at least two
 letters/numbers suggests items, tags and collections, with the source box shown
@@ -24,6 +44,24 @@ the current filters and run entirely locally.
 See [organization design](docs/system-design/adrs/0008-tags-and-collections.md).
 
 The [system design](SYSTEM_DESIGN.md) is the authoritative specification; historical delivery statements in that baseline are not implementation evidence. See [implementation status](docs/verification/IMPLEMENTATION_STATUS.md) and [deployment evidence and gaps](docs/verification/deployment.md) for what has actually been checked.
+
+## Authentication and help
+
+Open **Help and setup** (`/help`) for the complete installation, configuration,
+authentication, inventory, AI and recovery guides. Help is available before login.
+The first owner is the protected **core system administrator**: setup suggests
+`admin`, requires a unique password and provides no shared factory credential.
+That account cannot be disabled, demoted or linked to OAuth. Local passwords use
+salted Argon2id with a separate installation pepper; preserve its private file.
+
+**System → Users** manages accounts and roles. **System → Authentication** manages
+provider identity links and session revocation, and shows sign-in history.
+Optional OIDC sign-in uses authorization code with PKCE and explicit issuer/subject
+bindings to local users. Register your own provider client and configure its
+private secret on the host; no provider is enabled automatically.
+See [authentication setup](docs/help/authentication.md),
+[administration and account recovery](docs/help/administration.md), and the
+[implementation verification](docs/verification/authentication-store.md).
 
 ## Native quickstart
 
@@ -109,21 +147,36 @@ The build command above is the simplest same-origin workflow. A separate Vite de
 
 ## Production configuration with local HTTPS
 
-Docker Engine and the Compose plugin are required. From the repository root:
+Docker Engine and Compose are required. Copy `deploy/.env.example` to
+`deploy/.env` and set `BOXEN_HOST` and `BOXEN_BIND_ADDRESS` to your server's LAN
+address for phone access. Defaults are loopback-only. The public origin is
+derived from that host and `BOXEN_HTTPS_PORT` (8443 by default).
 
 ```sh
-docker compose -p boxen -f deploy/compose.yaml config --quiet
-docker compose -p boxen -f deploy/compose.yaml build web caddy
-docker compose -p boxen -f deploy/compose.yaml run --rm --no-deps init
-docker compose -p boxen -f deploy/compose.yaml up -d --no-build --pull never web worker caddy
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.build.yaml config --quiet
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.build.yaml build web caddy
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml run --rm --no-deps --pull never init
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml up -d --no-build --pull never --wait web worker caddy
 ```
 
-This runs non-root services, persists application/CA state in named volumes, and publishes only `127.0.0.1:8443`. Follow the [deployment and CA trust runbook](docs/operations/deployment.md) before using <https://localhost:8443/setup>. A browser certificate warning is expected until you deliberately trust this installation's CA. Do not bypass certificate checks as a permanent setup.
+The app image serves UI/API and runs the worker separately. Local model execution
+has its own optional container/read-only model volume; an explicitly configured
+remote vision endpoint is also supported. Base Compose needs images only and is
+ready for future Docker Hub image references; nothing has been published yet.
+Skip building when using preloaded/released images.
+
+Follow the [Docker deployment guide](docs/operations/deployment.md),
+[volume/configuration specs](docs/operations/container-storage.md) and
+[remote-AI contract](docs/operations/remote-ai.md). Application data and local CA
+state persist in named volumes. Starting this stack creates a separate inventory;
+it does not migrate your native installation. Keep init's setup token private.
+The UI works anonymously without initial owner setup. Review the local certificate
+warning or install the verified CA; camera permission remains browser-controlled.
 
 ## Operations
 
-Existing installations need the explicit **0002** schema upgrade for tags and
-collections. Keep a verified pre-upgrade backup, stop web and worker processes,
+Existing installations need the explicit **0003** schema upgrade for the authentication
+store (including the earlier tags and collections migration). Keep a verified pre-upgrade backup, stop web and worker processes,
 then run `.venv/bin/boxen init` with the installation's existing configuration
 and data directory before restarting them. Do not select a new data directory.
 Startup checks schema compatibility; it does not silently migrate a running
@@ -131,6 +184,7 @@ database. Old 0001 backups remain verifiable and are upgraded only in a staging
 copy during an offline restore. See the recovery runbook below.
 
 - [Deployment, configuration, CA trust and service commands](docs/operations/deployment.md)
+- [Tailscale containers: migration, restart, verification and rollback](docs/operations/container-tailnet.md)
 - [Daily backups, offline restore/quarantine and disconnected transfer](docs/operations/recovery.md)
 - [Optional local model provisioning and disabled behavior](docs/operations/models.md)
 

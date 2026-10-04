@@ -14,8 +14,7 @@ PRIVATE_OPERATIONS = [
     for path, methods in api_contract()["paths"].items()
     for method, op in methods.items()
     if method in {"get", "post", "put", "patch", "delete"}
-    and op["operationId"]
-    not in {"getSetupStatus", "createFirstOwner", "login", "getLiveness", "getReadiness"}
+    and op.get("security", api_contract()["security"]) != []
 ]
 
 

@@ -2,6 +2,10 @@ import base64
 import hashlib
 import io
 import json
+import os
+import re
+import ssl
+import stat
 import time
 from pathlib import Path
 
@@ -83,6 +87,8 @@ occlusion warning when appropriate. Return this schema:\n"""
 
 
 class LocalVision:
+    """Shared review adapter; remote transport is enabled only by explicit settings."""
+
     def __init__(self, settings):
         self.settings = settings
         self.schema = json.loads((settings.assets / "ai-inventory-output.schema.json").read_text())
@@ -93,14 +99,22 @@ class LocalVision:
         self.error: str | None = "ai.not_installed"
         if settings.ai_profile:
             try:
-                root = settings.data_dir / "models" / settings.ai_profile
-                profile = json.loads((root / "manifest.json").read_text())
+                root = settings.models_dir / settings.ai_profile
+                with (root / "manifest.json").open("rb") as manifest:
+                    raw = manifest.read(128 * 1024 + 1)
+                if len(raw) > 128 * 1024:
+                    raise ValueError("profile size")
+                profile = strict_json(raw)
+                if not isinstance(profile, dict):
+                    raise ValueError("profile object")
                 for value in (
                     profile["display_name"],
                     profile["model"]["id"],
                     profile["runtime"]["id"],
                     profile["runtime"]["version"],
                 ):
+                    if not isinstance(value, str):
+                        raise ValueError("profile metadata")
                     text_value(value, 160, "Profile metadata")
                 if (
                     profile["profile_id"] != settings.ai_profile
@@ -110,27 +124,16 @@ class LocalVision:
                 ):
                     raise ValueError("profile version")
                 for artifact in ("model", "projector", "runtime"):
-                    item = profile[artifact]
-                    path = (root / item["path"]).resolve()
-                    if (
-                        not path.is_relative_to(root.resolve())
-                        or not path.is_file()
-                        or file_hash(path) != item["sha256"]
-                    ):
-                        raise ValueError("artifact checksum")
+                    self._verify_artifact(root, profile[artifact])
+                if not isinstance(profile.get("runtime_files", []), list):
+                    raise ValueError("runtime dependencies")
                 for item in profile.get("runtime_files", []):
-                    path = (root / item["path"]).resolve()
-                    if (
-                        not path.is_relative_to(root.resolve())
-                        or not path.is_file()
-                        or file_hash(path) != item["sha256"]
-                    ):
-                        raise ValueError("runtime dependency checksum")
+                    self._verify_artifact(root, item)
                 if not isinstance(profile["license_files"], list) or not profile["license_files"]:
                     raise ValueError("licenses required")
                 for license_file in profile["license_files"]:
-                    path = (root / license_file).resolve()
-                    if not path.is_relative_to(root.resolve()) or not path.is_file():
+                    path = self._profile_path(root, license_file)
+                    if self.settings.ai_mode == "local" and not path.is_file():
                         raise ValueError("license missing")
                 if (
                     profile.get("prompt_sha256") != hashlib.sha256(PROMPT.encode()).hexdigest()
@@ -138,49 +141,159 @@ class LocalVision:
                 ):
                     raise ValueError("prompt/schema checksum")
                 if (
-                    not 256 <= profile["max_output_tokens"] <= 8192
+                    type(profile["max_output_tokens"]) is not int
+                    or type(profile.get("initial_output_tokens", 256)) is not int
+                    or type(profile["max_image_edge"]) is not int
+                    or type(profile["worker_slots"]) is not int
+                    or not 256 <= profile["max_output_tokens"] <= 8192
                     or not 256
                     <= profile.get("initial_output_tokens", min(2048, profile["max_output_tokens"]))
                     <= profile["max_output_tokens"]
                     or profile["worker_slots"] != 1
                     or not 256 <= profile["max_image_edge"] <= 2048
                     or not 0 <= profile["temperature"] <= 1
-                    or not isinstance(profile["seed"], int)
+                    or type(profile["seed"]) is not int
                 ):
                     raise ValueError("profile resource limits")
+                if self.settings.ai_mode == "remote":
+                    profile["display_name"] = "Remote (operator-reported): " + profile["display_name"]
                 self.profile = profile
                 self.error = None
             except (OSError, ValueError, KeyError, TypeError, DomainError):
                 self.error = "ai.profile_invalid"
 
+    @staticmethod
+    def _profile_path(root: Path, name: str) -> Path:
+        if not isinstance(name, str) or not name or Path(name).is_absolute():
+            raise ValueError("profile artifact path")
+        path = (root / name).resolve()
+        if not path.is_relative_to(root.resolve()):
+            raise ValueError("profile artifact path")
+        return path
+
+    def _verify_artifact(self, root: Path, item: dict) -> None:
+        if not isinstance(item, dict) or not isinstance(item.get("sha256"), str):
+            raise ValueError("artifact SHA256 required")
+        if not re.fullmatch(r"[0-9a-fA-F]{64}", item["sha256"]):
+            raise ValueError("artifact SHA256 required")
+        item["sha256"] = item["sha256"].lower()
+        path = self._profile_path(root, item["path"])
+        # Remote profiles retain declared identity and resource metadata only.
+        # Listing a model ID cannot attest to these operator-supplied digests.
+        if self.settings.ai_mode == "local" and (not path.is_file() or file_hash(path) != item["sha256"]):
+            raise ValueError("artifact checksum")
+
+    @property
+    def artifact_verification(self) -> str:
+        return (
+            "operator_reported_not_locally_verified"
+            if self.settings.ai_mode == "remote"
+            else "local_checksums_verified"
+        )
+
+    def _client(self, timeout: float) -> httpx.Client:
+        try:
+            headers = {}
+            if self.settings.ai_api_key_file is not None:
+                # Nonblocking open plus a regular-file check avoids secret FIFOs
+                # or devices turning a bounded read into an indefinite wait.
+                fd = os.open(self.settings.ai_api_key_file, os.O_RDONLY | os.O_NONBLOCK)
+                with os.fdopen(fd, "rb") as secret:
+                    if not stat.S_ISREG(os.fstat(secret.fileno()).st_mode):
+                        raise ValueError("secret file")
+                    # Token payload plus one optional editor-added CRLF, and
+                    # one extra byte to detect an oversized file.
+                    value = secret.read(4099)
+                if value.endswith(b"\r\n"):
+                    value = value[:-2]
+                elif value.endswith(b"\n"):
+                    value = value[:-1]
+                if not 1 <= len(value) <= 4096 or any(byte < 33 or byte > 126 for byte in value):
+                    raise ValueError("secret value")
+                headers["Authorization"] = "Bearer " + value.decode("ascii")
+            verify: ssl.SSLContext | bool = True
+            if self.settings.ai_ca_file is not None:
+                if not self.settings.ai_ca_file.is_file():
+                    raise ValueError("CA file")
+                verify = ssl.create_default_context(cafile=str(self.settings.ai_ca_file))
+            return httpx.Client(
+                trust_env=False, timeout=timeout, follow_redirects=False, verify=verify, headers=headers
+            )
+        except (OSError, ValueError):
+            raise DomainError(
+                "ai.transport_invalid", "AI authentication or TLS configuration is unavailable.", 503
+            ) from None
+
     def readiness(self) -> dict:
+        remote = self.settings.ai_mode == "remote"
         if not self.profile:
             return {
                 "status": "unavailable",
                 "code": self.error,
-                "message": "Local AI is not installed."
+                "message": ("Remote AI is not configured." if remote else "Local AI is not installed.")
                 if self.error == "ai.not_installed"
+                else "The AI profile metadata failed verification."
+                if remote
                 else "The local model profile failed verification.",
             }
         try:
-            with httpx.Client(trust_env=False, timeout=2, follow_redirects=False) as client:
-                response = client.get(self.settings.ai_base_url + "/health")
-                response.raise_for_status()
-            return {"status": "ready", "code": None, "message": self.profile["display_name"]}
-        except httpx.HTTPError:
+            deadline = time.monotonic() + 2
+            with self._client(2) as client:
+                with client.stream(
+                    "GET", self.settings.ai_base_url + ("/v1/models" if remote else "/health")
+                ) as response:
+                    response.raise_for_status()
+                    if remote:
+                        envelope = strict_json(self._read_response(response, deadline))
+                        if not isinstance(envelope, dict) or not isinstance(envelope.get("data"), list):
+                            raise ValueError("models envelope")
+                        if not all(isinstance(model, dict) for model in envelope["data"]):
+                            raise ValueError("models entries")
+                        if not any(
+                            model.get("id") == self.profile["model"]["id"] for model in envelope["data"]
+                        ):
+                            raise DomainError(
+                                "ai.model_unavailable", "The configured remote model ID is unavailable.", 503
+                            )
             return {
-                "status": "unavailable",
-                "code": "ai.runtime_unavailable",
-                "message": "The local AI runtime is unavailable.",
+                "status": "ready",
+                "code": None,
+                "message": self.profile["display_name"]
+                + (
+                    "; artifact hashes are not locally verified or remotely attested."
+                    if remote
+                    else "; local artifact checksums verified."
+                ),
             }
+        except DomainError as exc:
+            if exc.code in {"ai.transport_invalid", "ai.model_unavailable"}:
+                return {"status": "unavailable", "code": exc.code, "message": exc.detail}
+        except (httpx.HTTPError, httpx.InvalidURL, ValueError):
+            pass
+        return {
+            "status": "unavailable",
+            "code": "ai.runtime_unavailable",
+            "message": "The remote AI service is unavailable."
+            if remote
+            else "The local AI runtime is unavailable.",
+        }
+
+    @staticmethod
+    def _read_response(response: httpx.Response, deadline: float) -> bytes:
+        raw = bytearray()
+        for chunk in response.iter_bytes():
+            if time.monotonic() >= deadline:
+                raise DomainError("ai.timeout", "Analysis exceeded its time limit.", 503)
+            raw.extend(chunk)
+            if len(raw) > 512 * 1024:
+                raise DomainError("ai.output_invalid", "The model returned an oversized response.")
+        return bytes(raw)
 
     def analyze(self, path: Path) -> dict:
         self.last_input_sha256 = None
         self.last_metrics = {"requests": [], "input_tokens": None, "output_tokens": None}
         if not self.profile:
-            raise DomainError(
-                self.error or "ai.not_installed", "The local model profile is unavailable.", 503
-            )
+            raise DomainError(self.error or "ai.not_installed", "The AI model profile is unavailable.", 503)
         with Image.open(path) as image:
             image.thumbnail(
                 (self.profile["max_image_edge"], self.profile["max_image_edge"]), Image.Resampling.LANCZOS
@@ -214,9 +327,10 @@ class LocalVision:
                 "type": "json_schema",
                 "json_schema": {"name": "boxen_inventory", "strict": True, "schema": GENERATION_SCHEMA},
             },
-            "chat_template_kwargs": {"enable_thinking": False},
             "stream": False,
         }
+        if self.settings.ai_mode == "local":
+            payload["chat_template_kwargs"] = {"enable_thinking": False}
         deadline = time.monotonic() + self.settings.ai_timeout
         maximum = self.profile["max_output_tokens"]
         initial = self.profile.get("initial_output_tokens", min(2048, maximum))
@@ -228,6 +342,8 @@ class LocalVision:
             try:
                 choice = envelope["choices"][0]
                 reason = choice.get("finish_reason")
+                if reason not in (None, "stop", "length"):
+                    raise ValueError("unexpected finish reason")
                 usage = envelope.get("usage") or {}
                 entry = {"max_output_tokens": budget, "finish_reason": reason}
                 for target, source in (
@@ -242,12 +358,10 @@ class LocalVision:
                     self.last_metrics[name] = sum(values) if all(v is not None for v in values) else None
                 if reason == "length":
                     continue
-                if reason not in (None, "stop"):
-                    raise ValueError("unexpected finish reason")
                 return self.expand(choice["message"]["content"].encode())
             except (KeyError, IndexError, AttributeError, TypeError, ValueError):
                 raise DomainError(
-                    "ai.output_invalid", "The local model response did not match the output contract."
+                    "ai.output_invalid", "The model response did not match the output contract."
                 ) from None
         raise DomainError(
             "ai.output_truncated",
@@ -258,35 +372,27 @@ class LocalVision:
     def _request(self, payload: dict, deadline: float) -> dict:
         remaining = deadline - time.monotonic()
         if remaining <= 0:
-            raise DomainError("ai.timeout", "Local analysis exceeded its time limit.", 503)
+            raise DomainError("ai.timeout", "Analysis exceeded its time limit.", 503)
         try:
-            with httpx.Client(trust_env=False, timeout=remaining, follow_redirects=False) as client:
+            with self._client(remaining) as client:
                 with client.stream(
                     "POST", self.settings.ai_base_url + "/v1/chat/completions", json=payload
                 ) as response:
                     response.raise_for_status()
-                    raw = bytearray()
-                    for chunk in response.iter_bytes():
-                        if time.monotonic() >= deadline:
-                            raise DomainError("ai.timeout", "Local analysis exceeded its time limit.", 503)
-                        raw.extend(chunk)
-                        if len(raw) > 512 * 1024:
-                            raise DomainError(
-                                "ai.output_invalid", "The model returned an oversized response."
-                            )
+                    raw = self._read_response(response, deadline)
             try:
-                envelope = strict_json(bytes(raw))
+                envelope = strict_json(raw)
                 if not isinstance(envelope, dict):
                     raise ValueError("response must be an object")
                 return envelope
             except (DomainError, ValueError):
                 raise DomainError(
-                    "ai.output_invalid", "The local model returned an invalid response envelope."
+                    "ai.output_invalid", "The model returned an invalid response envelope."
                 ) from None
         except httpx.TimeoutException:
-            raise DomainError("ai.timeout", "Local analysis exceeded its time limit.", 503) from None
-        except httpx.HTTPError:
-            raise DomainError("ai.runtime_unavailable", "The local AI runtime is unavailable.", 503) from None
+            raise DomainError("ai.timeout", "Analysis exceeded its time limit.", 503) from None
+        except (httpx.HTTPError, httpx.InvalidURL):
+            raise DomainError("ai.runtime_unavailable", "The AI service is unavailable.", 503) from None
 
     def expand(self, raw: bytes) -> dict:
         try:
@@ -312,10 +418,10 @@ class LocalVision:
                 ],
             }
             return self.validate(json.dumps(expanded).encode())
-        except Exception as exc:
+        except Exception:
             raise DomainError(
                 "ai.output_invalid", "The model output failed validation. No suggestions were added."
-            ) from exc
+            ) from None
 
     def validate(self, raw: bytes) -> dict:
         try:
@@ -331,7 +437,7 @@ class LocalVision:
                 if box and (box["x"] + box["width"] > 1 or box["y"] + box["height"] > 1):
                     raise ValueError
             return output
-        except Exception as exc:
+        except Exception:
             raise DomainError(
                 "ai.output_invalid", "The model output failed validation. No suggestions were added."
-            ) from exc
+            ) from None

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Keep the project, persistent volumes and selected overlays consistent.
+set -euo pipefail
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+config="${BOXEN_TAILNET_ENV_FILE:-$root/.local/boxen-container.env}"
+if [[ ! -f "$config" ]]; then
+  echo "Missing $config. See docs/operations/container-tailnet.md." >&2
+  exit 1
+fi
+exec docker compose --env-file "$config" -p boxen-tailnet \
+  -f "$root/deploy/compose.yaml" \
+  -f "$root/deploy/compose.tailnet.yaml" \
+  -f "$root/deploy/compose.ai-local.yaml" \
+  -f "$root/deploy/compose.build.yaml" \
+  -f "$root/deploy/compose.ai-build.yaml" "$@"

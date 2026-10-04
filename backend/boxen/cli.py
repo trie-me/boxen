@@ -1,5 +1,6 @@
 import argparse
 import fcntl
+import getpass
 import json
 import os
 from contextlib import contextmanager
@@ -40,13 +41,13 @@ def administrative_application(settings, command, action=None):
     with (settings.data_dir / "db/runtime.lock").open("a+") as lock:
         # Restore owns its exclusive lock internally. Its preflight is read-only.
         if command != "restore" or action == "verify":
-            mode = fcntl.LOCK_EX if command == "repair-derivatives" else fcntl.LOCK_SH
+            mode = fcntl.LOCK_EX if command in {"repair-derivatives", "admin-password"} else fcntl.LOCK_SH
             try:
                 fcntl.flock(lock, mode | fcntl.LOCK_NB)
             except BlockingIOError:
                 raise DomainError(
                     "maintenance.services_running",
-                    "Another service is using this data directory. Stop services before repair or restore.",
+                    "Another service is using this data directory. Stop services before offline maintenance.",
                     409,
                 ) from None
         application = Application(settings)
@@ -69,6 +70,9 @@ def main():
     sub.add_parser("verify", help="Verify database, search, and originals")
     sub.add_parser("repair-derivatives", help="Rebuild image derivatives from originals")
     sub.add_parser("backup", help="Create a verified backup")
+    sub.add_parser(
+        "admin-password", help="Reset the core administrator password offline using a secure prompt"
+    )
     restore = sub.add_parser("restore", help="Restore offline, retaining current data in quarantine")
     restore.add_argument("action", choices=["preflight", "apply", "verify"])
     restore.add_argument("backup_path", type=Path, nargs="?")
@@ -126,7 +130,17 @@ def run_administrative_command(application, args, parser):
     from boxen.identity.domain import Actor
     from boxen.shared.values import new_id, now
 
-    if args.command == "verify" or (args.command == "restore" and args.action == "verify"):
+    if args.command == "admin-password":
+        password = getpass.getpass("New core administrator password: ")
+        confirmation = getpass.getpass("Confirm new password: ")
+        if password != confirmation:
+            parser.error("Passwords did not match. Nothing changed.")
+        with application.database.transaction(write=True) as repo:
+            user = application.identity.reset_admin_password(repo, password, new_id())
+        print(
+            f"Core administrator {user['username']} password reset. Existing sign-in sessions were revoked."
+        )
+    elif args.command == "verify" or (args.command == "restore" and args.action == "verify"):
         with application.database.transaction() as repo:
             result = {
                 "database": repo.execute("PRAGMA integrity_check").scalar(),

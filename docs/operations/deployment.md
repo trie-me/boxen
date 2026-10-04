@@ -1,82 +1,173 @@
-# Deployment and local HTTPS
+# Docker deployment
 
-Run commands from the repository root. These instructions describe the current source, not every intended capability in the design baseline. The existing native installation now uses [local HTTPS with Motorola setup](native-https.md); the Compose instructions below describe a separate deployment option, not a migration of that inventory.
+Base Compose creates a separate installation. For the existing installation's
+Tailscale address, data-preserving migration and daily container commands, see
+[the Tailscale container runbook](container-tailnet.md).
+See [volume/configuration specs](container-storage.md), [the architecture decision](../system-design/adrs/0010-container-deployment-and-ai-boundary.md) and [verification](../verification/containers.md).
 
-## Preflight and configuration
+## Images and platform
 
-Use a local filesystem with working SQLite/WAL locking, enough space for originals, derivatives, backups and a complete restore copy, and a protected host account. Production refuses configured reserve limits below 2 GiB and 5%; uploads/backups may fail before the disk is full. A comprehensive installer/preflight command is not implemented.
+| Variable | Local default | Role |
+| --- | --- | --- |
+| `BOXEN_IMAGE` | `boxen:0.1.0` | Packaged UI/API, worker, init and maintenance |
+| `BOXEN_CADDY_IMAGE` | `boxen-caddy:0.1.0` | HTTPS proxy with configuration included |
+| `BOXEN_AI_IMAGE` | `boxen-ai:0.1.0` | Optional CPU launcher/libraries; no weights |
 
-`BOXEN_CONFIG_FILE=/absolute/path/config.toml` loads flat TOML settings; recognized `BOXEN_*` environment variables override them. [local.example.toml](../../deploy/local.example.toml) is a native-development example. Keep settings identical for web, worker and CLI. Do not pass Compose-only variables such as `BOXEN_HOST` into a native Boxen process: unknown `BOXEN_*` fields are rejected.
+These are **not published Docker Hub repositories**. Set the references to an
+owned namespace/release or digest when images are actually published. Base
+Compose consumes images; source builds use overlays. No push or automatic updater
+is configured. Docker Engine/Desktop and Compose are prerequisites. Linux amd64
+is the initial tested platform; Docker Desktop, ARM64 and GPU are not thereby
+qualified. Provisioning may need downloads; local runtime needs no public service.
 
-| Setting | Current behavior |
-| --- | --- |
-| `BOXEN_ENV` | `production` requires HTTPS; `development` permits explicit trusted-LAN HTTP as well as loopback. LAN HTTP is unencrypted and live browser camera needs HTTPS. |
-| `BOXEN_ORIGIN` | Exact browser origin, including nonstandard port, with no trailing slash/path. Compose defaults to `https://localhost:8443`. Host and mutation Origin are checked. |
-| `BOXEN_DATA_DIR` | Native: explicitly choose an absolute local path. Compose: `/var/lib/boxen/data`, inside the `boxen-data` volume mounted at `/var/lib/boxen`. |
-| `BOXEN_ANONYMOUS_ACCESS` | `editor` default allows ordinary editing without an account; `viewer` is read-only; `off` requires login. Neither anonymous mode permits administration. |
-| `BOXEN_AI_PROFILE` | Unset means no model. The base Compose file includes no inference service. |
-| `BOXEN_AI_BASE_URL` | Default private `http://boxen-ai:8080`; use `http://127.0.0.1:8080` for a native local runtime. |
-| `BOXEN_WORKER_SLOTS` | Only `1` is supported. Run one worker. |
-| `BOXEN_BACKUP_RETENTION` | Defaults to `14`, but automatic pruning is not implemented. |
+## New installation
 
-Compose-only interpolation variables are `BOXEN_HOST` (default `localhost`), `BOXEN_HTTPS_PORT` (`8443`) and `BOXEN_BIND_ADDRESS` (`127.0.0.1`). Change host/port only together with the exact application origin. The current configuration exposes no HTTP port, web port, Caddy admin port or AI port. Web and worker use an internal network; only Caddy also joins an ingress bridge so Docker can publish its loopback HTTPS port. Caddy listens on unprivileged container port 8443 with all capabilities dropped and its binary's file capabilities removed. Caddy uses its own internal CA without public ACME and does not install trust on your host automatically. The proxy ingress bridge technically permits outbound connections, but no external service is required or configured. mDNS/DNS advertising is not implemented.
+Run from the repository root. Copy [the example](../../deploy/.env.example) to
+`deploy/.env` and edit it. For phones use your server's actual stable LAN IP:
 
-The shared web/worker volume is writable because upload finalization currently happens in web. Both run as UID/GID 10001, with read-only root filesystems, dropped capabilities, bounded temporary storage and no privilege escalation. Each application process has a 330-second stop grace period for the maximum 300-second inference timeout. Logs rotate at three 10 MiB files per service; the design's time-based retention is not implemented.
-
-**Existing installations:** the current layout places data under `/var/lib/boxen/data` so restore can rename it to a sibling quarantine on the same filesystem. Earlier manifests used `/var/lib/boxen` itself. Do not initialize a new empty installation over that older volume layout; stop services, preserve the volume, and migrate the existing complete tree into a child directory before adopting this manifest. That migration has not been rehearsed here.
-
-## First owner and CA trust
-
-Use the build/init/up sequence in the [README](../../README.md). `init` creates the schema, installation identity and protected session/setup secrets. Startup does not automatically initialize a missing database. Keep the printed token out of shared logs and messages. If initial output was lost before setup, read the existing token only at your host console:
-
-```sh
-docker compose -p boxen -f deploy/compose.yaml run --rm --no-deps --entrypoint python web -c 'from pathlib import Path; print(Path("/var/lib/boxen/data/secrets/setup-token").read_text())'
+```dotenv
+BOXEN_HOST=192.0.2.10
+BOXEN_BIND_ADDRESS=192.0.2.10
+BOXEN_HTTPS_PORT=8443
+BOXEN_ANONYMOUS_ACCESS=editor
 ```
 
-After Caddy starts, export its **public root certificate**, display its fingerprint, and test without disabling TLS verification:
+Defaults deliberately publish loopback only. Host has no scheme/path/port;
+Compose derives the exact origin from host and HTTPS port. Do not set a separate
+`BOXEN_ORIGIN`. Bracket IPv6 addresses. Bind `0.0.0.0` means all interfaces;
+retain one exact reachable host. Prefer a specific trusted-LAN interface.
+Anyone who can connect gets the selected anonymous permissions. No router/WAN
+port forwarding.
+
+Build local images; installers run in builds, not on the host:
+
+```sh
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.build.yaml config --quiet
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.build.yaml build web caddy
+```
+
+With published/preloaded images, skip building; pull at provisioning time or use
+`docker image load` for disconnected transfer. Then initialize and start:
+
+```sh
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml run --rm --no-deps --pull never init
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml up -d --no-build --pull never --wait web worker caddy
+```
+
+Keep init's printed one-time token private; its Docker log driver is disabled.
+Web startup does not silently initialize/migrate. Anonymous `editor` permits
+box creation immediately; use `/setup` and the token to create an owner for
+administration. `viewer` is read-only; `off` requires local accounts.
+
+Open **HTTPS** at the chosen host and port on both host and phone. Localhost on a
+phone means the phone. Permit the chosen port from your LAN in the host firewall;
+guest-Wi-Fi isolation can still block access. No HTTP/API, Caddy administration
+or model port is published.
+
+## Local HTTPS and camera
+
+Caddy uses its own CA without public ACME/DNS and does not install host trust.
+Inspect the expected local certificate/address before accepting a browser
+warning through its normal flow, where supported. Optionally install the
+verified public CA for warning-free access. Camera permission is a separate
+browser/device step; accepting a certificate does not grant it. Physical
+Android/Brave behavior is not proven by desktop synthetic-camera tests.
+
+Export **only the public root**, never private keys:
 
 ```sh
 mkdir -p .local/boxen-trust
-docker compose -p boxen -f deploy/compose.yaml cp caddy:/data/caddy/pki/authorities/local/root.crt .local/boxen-trust/root.crt
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml cp caddy:/data/caddy/pki/authorities/local/root.crt .local/boxen-trust/root.crt
 openssl x509 -in .local/boxen-trust/root.crt -noout -subject -fingerprint -sha256
-curl --fail --cacert .local/boxen-trust/root.crt https://localhost:8443/api/v1/health/ready
+curl --fail --cacert .local/boxen-trust/root.crt https://192.0.2.10:8443/api/v1/health/ready
 ```
 
-Compare the SHA-256 fingerprint through a trusted host-console channel before importing the root into an OS/browser trust store. Only distribute `root.crt`; the Caddy volume also contains private CA keys and must remain protected. Browser trust installation differs by OS/browser; phone trust and secure-context camera behavior still require real-device testing. The application currently has no authenticated CA-download/fingerprint page.
+Use your configured URL. Check the fingerprint through a trusted host console
+before importing trust. Preserve the CA volumes. Do not distribute the complete
+Caddy volume or disable TLS/browser security globally.
 
-Open `https://localhost:8443/setup` on the host and create the owner with the one-time token. There is no preconfigured password. Anonymous browsing does not grant administration. To require accounts, start/recreate services with `BOXEN_ANONYMOUS_ACCESS=off` set in your Compose environment.
+## Separate local model container
 
-`localhost` on a phone refers to the phone, not this server. For immediate native trusted-LAN HTTP, use the [README LAN startup](../../README.md#phones-and-other-devices-on-your-lan); it does not require Docker or a certificate for ordinary inventory/upload operations.
-
-## LAN HTTPS
-
-Use this for encrypted traffic and live browser-camera scanning. For an **existing Compose installation**, stop/recreate its services with a matching LAN address and exact origin; example for a host that owns `192.0.2.10`:
+Base deployment works without AI. Provision a checksum-pinned profile using the
+[model guide](models.md). Set `BOXEN_AI_PROFILE=qwen3-vl-2b-q4-cpu` in
+`deploy/.env` for the existing CPU profile. No runtime model download occurs.
 
 ```sh
-export BOXEN_BIND_ADDRESS=192.0.2.10
-export BOXEN_HOST=192.0.2.10
-export BOXEN_ORIGIN=https://192.0.2.10:8443
-export BOXEN_ANONYMOUS_ACCESS=editor
-docker compose -p boxen -f deploy/compose.yaml config --quiet
-docker compose -p boxen -f deploy/compose.yaml up -d --no-build --pull never web worker caddy
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.ai-local.yaml -f deploy/compose.ai-build.yaml build boxen-ai
 ```
 
-For a new Compose installation, use these same variables for the README build/init/up sequence. Do **not** switch an existing native installation to the default empty Compose volume: that would show a different inventory, not migrate your data. Native installations can instead keep their same data directory and loopback backend behind a locally installed reverse proxy, with its exact public HTTPS origin configured in Boxen.
-
-Open `https://192.0.2.10:8443` on both host and phones. Permit only the HTTPS port through the host firewall from the trusted LAN. Do not forward it at the router. Caddy issues a local certificate; export its public root certificate as above and deliberately install/trust it on each device after checking the fingerprint. Use the LAN HTTPS URL in the certificate-verifying curl check, not `localhost`. A successful desktop request alone is not proof of phone reachability or phone trust. Verify a phone can create a box, upload a photo, and start/stop the live QR camera after granting permission. No public DNS, public ACME, cloud tunnel or external runtime service is required.
-
-## Routine commands
+Import a complete existing profile using its actual source path. Only this
+explicit `model-import` tool runs as container root with CHOWN/DAC_OVERRIDE and
+read/write models, with networking disabled. Normal runtime stays non-root with
+all capabilities dropped and read-only models. The importer verifies hashes,
+refuses overwrites, assigns the new tree to UID/GID10001 and leaves the source
+read-only. It shares only the selected project's model volume, not inventory.
 
 ```sh
-docker compose -p boxen -f deploy/compose.yaml ps
-docker compose -p boxen -f deploy/compose.yaml logs --tail 100 web worker caddy
-docker compose -p boxen -f deploy/compose.yaml run --rm --no-deps web verify
-docker compose -p boxen -f deploy/compose.yaml stop caddy web worker
-docker compose -p boxen -f deploy/compose.yaml up -d --no-build --pull never web worker caddy
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.ai-local.yaml run --rm --no-deps --pull never --volume /absolute/provisioned/qwen3-vl-2b-q4-cpu:/source:ro model-import
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.ai-local.yaml up -d --no-build --pull never web worker caddy boxen-ai
 ```
 
-`verify` reports database integrity, foreign-key errors, search mismatches and missing/corrupt originals; inspect its JSON as well as exit status. The owner System screen reports worker heartbeat, AI, disk and recent verified-backup health. Core readiness may remain healthy when AI or the worker is unavailable. Preserve volumes on shutdown: ordinary `stop` or `down` retains them; `down --volumes` destroys data and CA state and is not a routine command.
+AI has no inventory or session-secrets mount and no published port. Loading
+weights may take time; manual inventory stays usable. Defaults are
+`BOXEN_AI_THREADS=8`, `BOXEN_AI_CPUS=8`, `BOXEN_AI_MEMORY=8g`; adjust to the
+host/model. These are not speed guarantees. One worker/inference slot is
+supported. Use this overlay consistently on later commands.
 
-For upgrades, create a verified backup, retain the prior image and configuration, stop services, load/build the compatible image, run `init` explicitly if that release calls for a migration, then restart and verify. The current schema is `0002`. Do not assume down-migrations or automatic rollback exist. Restore a compatible backup with the corresponding prior image if needed.
+## Optional remote vision server
 
-Native long-running installations can supervise the exact `boxen web` and `boxen worker` commands from the README using their host service manager and a dedicated account. This repository currently provides Compose, not tested systemd unit files.
+Use `compose.ai-remote.yaml` **instead of** local AI. See the precise
+[endpoint contract](remote-ai.md). Remote mode explicitly adds outbound routing
+to web/worker. Requested analysis sends a resized photo there; the UI discloses
+this. No cloud fallback exists and manual inventory stays local.
+
+```dotenv
+BOXEN_AI_PROFILE=qwen3-vl-2b-q4-cpu
+BOXEN_AI_BASE_URL=https://your-inference-host:8443
+BOXEN_AI_PROFILES_DIR=/absolute/private/remote-profiles
+```
+
+Place metadata at `<profiles-dir>/<profile>/manifest.json`, readable by UID10001.
+Weights are not required. Hashes are operator-reported, not remotely attested.
+Optional `compose.ai-remote-auth.yaml` and `compose.ai-remote-ca.yaml` use
+`BOXEN_AI_API_KEY_SOURCE` and `BOXEN_AI_CA_SOURCE` host file paths. Never put
+credential values in .env, URLs, images or Git.
+
+```sh
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.ai-remote.yaml config --quiet
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml -f deploy/compose.ai-remote.yaml up -d --no-build --pull never web worker caddy
+```
+
+HTTPS verification is enabled. Trusted-LAN plain HTTP requires explicit
+`BOXEN_AI_ALLOW_INSECURE_HTTP=true`; photos/prompts/tokens then travel unencrypted.
+Custom CA trust does not disable verification. Drain/cancel pending analyses
+before changing endpoint/model; do not reuse profile IDs for different artifacts.
+Stop an old local AI container when switching away from it.
+
+## Operations and release
+
+Add selected AI overlays consistently to these base commands:
+
+```sh
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml ps
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml logs --tail 100 web worker caddy
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml run --rm --no-deps --pull never web verify
+docker compose --env-file deploy/.env -p boxen -f deploy/compose.yaml stop
+```
+
+Read integrity JSON as well as exit status. Ordinary stop/down preserves volumes.
+**Never use down --volumes as an ordinary stop/upgrade.** The test harness removes
+only its own uniquely named disposable project. See [storage](container-storage.md)
+and [recovery](recovery.md) before upgrades/migration; the current schema is 0003.
+Authentication upgrades require the same offline initialization procedure.
+See [authentication setup](../help/authentication.md) for the protected core
+administrator, password pepper, OIDC provider files and the optional OAuth
+network overlay, and [administration](../help/administration.md) for recovery.
+
+For a future Docker Hub release: choose the owned namespace, build/test each
+claimed architecture, tag app/proxy/optional AI, record immutable digests and
+scan results, and publish only with explicit authorization. Ship Compose,
+.env.example, model source locks and runbooks. Retain prior images and backups.
+Do not claim ARM/GPU support from a manifest alone. Docker's
+[multi-platform guidance](https://docs.docker.com/build/building/multi-platform/)
+describes the build mechanism, not application qualification.

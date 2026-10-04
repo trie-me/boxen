@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import urlsplit
 
+from boxen.api.oauth import OAUTH_OPERATION_IDS, register_oauth_routes
 from boxen.platform.application import Application
 from boxen.platform.config import Settings
 from boxen.platform.contracts import api_contract, resolve, strict_json, validate_payload
@@ -289,9 +290,13 @@ def create_app(settings: Settings | None = None, vision=None) -> FastAPI:
 
         return endpoint
 
+    register_oauth_routes(app, services)
+
     for path, item in api_contract()["paths"].items():
         for method, operation in item.items():
             if method in {"get", "post", "put", "patch", "delete"}:
+                if operation["operationId"] in OAUTH_OPERATION_IDS:
+                    continue
                 app.add_api_route(
                     "/api/v1" + path,
                     endpoint_factory(operation, item.get("parameters", []), method),

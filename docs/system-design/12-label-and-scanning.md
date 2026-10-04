@@ -56,6 +56,14 @@ Additional profiles require physical test evidence and a new profile version; us
 - Label background is white and ink is near-black for commodity thermal/laser printers.
 - Name is trimmed and Unicode-normalized for rendering but stored source is unchanged.
 - Name fits at nominal size, then decreases deterministically to minimum, then ellipsizes the final line. QR and code never shrink to make room.
+- Current collection names, when present, print beneath the name in Noto Sans,
+  alphabetically ordered and joined with a middle dot. Compact labels allocate
+  one line at 7.5 pt; large/A4 labels allocate up to two lines at 9 pt, shrinking
+  to 8 pt before ellipsizing. The title can shrink within its existing bounds
+  to preserve separation. QR allocation, quiet zone and typeable code stay fixed.
+- Memberships are read in the rendering transaction for individual, pinned and
+  collection sheets; each box uses all its own current memberships. Ungrouped
+  boxes have no collection line. Regenerate PDFs after membership/name changes.
 - Canonical code appears exactly once in readable text and as part of QR payload.
 - Inventory, description, user, location, timestamps, and network address are never printed in v1.
 - Renderer includes no dynamic creation time so identical inputs produce identical content bytes aside from controlled PDF object metadata; deterministic tests normalize/omit that metadata.
@@ -67,7 +75,10 @@ Additional profiles require physical test evidence and a new profile version; us
 - Fonts embedded/subset; no printer font dependency.
 - Vector QR modules; text remains vector glyphs.
 - Metadata includes Boxen renderer/profile versions but no username or host path.
-- Response ETag derives from box code/name/version, profile key/version, font checksums, and renderer version.
+- Individual-label ETags derive from box code/name/version, full normalized
+  collection names (including ellipsized text), profile key/version, font
+  checksums and renderer version. Batch ETags include the PDF bytes and full
+  per-box collection-name lists. Collection order is deterministic.
 - Filename is sanitized `<box-name>-<box-code>.pdf` with bounded ASCII fallback.
 - UI says `Print at 100% / Actual size` and detects/warns that browser print preview scaling cannot be controlled by Boxen.
 
@@ -134,3 +145,44 @@ Repeated identical detections within two seconds are debounced. A different cand
 - Assert zero camera tracks after every terminal/route state.
 - Assert QR upload bytes never appear in network requests or persistent browser storage.
 
+
+
+## 10. Batch printing and pin lists (2026-10-02)
+
+`/print-list` holds ordered unique box codes in browser storage, scoped by the
+current user ID. Selection is available on box cards, search results, box detail
+and the single-label screen. Pins survive navigation/reload, and the header
+shows their count. This is a browser convenience, not new inventory or a
+server-synchronized collection. Collection printing uses
+`/collections/:collectionId/labels` and leaves the pin list untouched.
+
+`POST /api/v1/labels.pdf` takes exactly one of `box_codes` (1–500 unique codes,
+ordered) or `collection_id` (current members in name/code order, including
+archived members). It resolves names and membership when generating the PDF.
+Missing boxes/collections and empty or oversized sets fail as a whole; no labels
+are silently omitted. Editor/owner authorization, same-origin and CSRF checks
+apply. The existing label limiter is shared: 30 documents per actor per minute.
+Generation changes no inventory, memberships or audit/idempotency records;
+PDF bytes are not stored in JSON retry records. No database migration is needed.
+
+The fixed batch profile is US Letter (612 × 792 PDF points), two columns and five
+rows of 4 × 2-inch labels, 0.5-inch top/bottom margins, 0.15625-inch side margins,
+and 0.1875-inch horizontal gutter. Labels fill left to right, top to bottom,
+continuing on as many pages as needed without a trailing blank page.
+`start_position` (1–10) skips slots only on the first page. `offset_x_mm` and
+`offset_y_mm` (−3 to +3, positive right/down) translate all labels without scaling.
+
+The geometry targets [Avery 5163/8163 stock](https://www.avery.com/templates/5163),
+with margin/pitch values cross-checked against the
+[LibreOffice label database](https://github.com/LibreOffice/core/blob/master/extras/source/labels/labels.xml)
+(Avery Letter Size 5163). Inch fractions are used directly instead of the
+rounded hundredths-of-a-millimeter values in that database. The PDF requests
+`PrintScaling=None` and `Duplex=Simplex`; the UI still instructs users to select
+Letter, actual size and portrait, and to check a plain-paper test against stock.
+Physical printer qualification is separate.
+
+Batch previews receive the already downloaded PDF bytes directly, preserving
+the existing Content Security Policy. The same PDF blob supports opening and
+downloading. Preview page navigation includes every generated page. Changing
+selection, label versions or alignment invalidates the previous PDF. Blob URLs
+are revoked and outstanding downloads aborted when the builder unmounts.

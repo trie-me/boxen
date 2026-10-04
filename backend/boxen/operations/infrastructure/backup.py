@@ -270,6 +270,18 @@ class Backups:
             "restore.wrong_installation",
             "The installation confirmation does not match this host and backup.",
         )
+        fingerprint = hashlib.sha256(self.settings.password_pepper()).hexdigest()
+        with sqlite3.connect(
+            (backup_path / "boxen.sqlite3").as_uri() + "?mode=ro&immutable=1", uri=True
+        ) as snapshot:
+            row = snapshot.execute(
+                "SELECT value_json FROM app_settings WHERE key='password_pepper_fingerprint'"
+            ).fetchone()
+            require(
+                row is None or json.loads(row[0]) == fingerprint,
+                "restore.pepper_mismatch",
+                "Restore the password pepper belonging to this backup before restoring its database.",
+            )
         if not apply:
             return {
                 "status": "ready",
@@ -318,6 +330,20 @@ class Backups:
                 with destination.open("rb") as file:
                     os.fsync(file.fileno())
             shutil.copytree(source_root / "secrets", restored / "secrets", dirs_exist_ok=True)
+            # A configured pepper can reside elsewhere under data_dir; preserve it across the directory swap.
+            pepper_path = self.settings.password_pepper_file
+            if pepper_path.is_relative_to(source_root):
+                restored_pepper = restored / pepper_path.relative_to(source_root)
+                restored_pepper.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+                shutil.copyfile(pepper_path, restored_pepper)
+                restored_pepper.chmod(0o600)
+                require(
+                    file_hash(restored_pepper) == fingerprint,
+                    "restore.pepper_mismatch",
+                    "The password pepper changed during restore. The current data was preserved.",
+                )
+                with restored_pepper.open("rb") as file:
+                    os.fsync(file.fileno())
             # Models and backup history remain reachable after restore; no destructive removal.
             for directory in ("models", "backups"):
                 shutil.copytree(
@@ -336,6 +362,12 @@ class Backups:
             db.execute("PRAGMA journal_mode=DELETE")
             db.execute("PRAGMA synchronous=FULL")
             db.execute("UPDATE sessions SET revoked_at=?", (now(),))
+            db.execute("DELETE FROM oidc_transactions")
+            db.execute(
+                "INSERT INTO app_settings(key,value_json,updated_at) VALUES('password_pepper_fingerprint',?,?) "
+                "ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at",
+                (json.dumps(fingerprint), now()),
+            )
             db.execute("DELETE FROM idempotency_records")
             db.execute(
                 "DELETE FROM app_settings WHERE key IN ('worker_heartbeat', 'ai_readiness', 'last_media_sweep')"

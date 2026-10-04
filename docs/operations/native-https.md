@@ -1,5 +1,13 @@
 # Native LAN HTTPS and Motorola Android trust
 
+Addresses and filesystem paths below are anonymized examples. Substitute your
+own host details and verify the certificate fingerprint from your own server.
+
+**Current address (2026-10-04):** `https://boxen.example-tailnet.ts.net:8443`.
+See [container Tailscale operation](container-tailnet.md) for current bindings and
+restart instructions. The old LAN URLs below redirect to that address; the
+existing CA and certificate setup remain applicable.
+
 Deployed on 2026-09-20 to `/path/to/boxen`, preserving the existing
 installation and anonymous editing. Server-side TLS and synthetic-camera browser
 checks passed; physical Motorola trust and camera permission still require the

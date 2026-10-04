@@ -1,8 +1,95 @@
 # Boxen implementation and verification
 
-Date: 2026-09-20. Independent local application; no event/submission integration or hosted service.
+Date: 2026-10-04. Independent local application; no event/submission integration or hosted service.
 
-## Latest: native LAN HTTPS
+## Latest follow-up: Tailscale containers (deployed 2026-10-04)
+
+The existing installation now runs as four containers (web, worker, proxy and
+local AI), retaining `https://boxen.example-tailnet.ts.net:8443`, the original CA,
+schema 0003, inventory and account secrets. Native services are stopped. A private
+stopped snapshot remains for rollback. All 26 stable database table hashes and
+secret/media/backup file hashes match the snapshot; integrity, foreign keys,
+search and model checks pass.
+
+53 packaging/import tests pass. Disposable dual-stack TLS, old-IP redirects,
+CRUD/media/search/PDF, real local inference, recreation persistence and manual
+operation with AI stopped pass. Live TLS, role/CSRF checks and desktop/mobile
+pin/reload/combined-PDF/collection navigation pass with no inventory mutations.
+See [container Tailscale evidence](container-tailnet.md) and
+[operation/restart/rollback instructions](../operations/container-tailnet.md).
+
+## Previous: native Tailscale address (2026-10-04)
+
+The native installation was first moved to
+`https://boxen.example-tailnet.ts.net:8443`, using the same local CA. Web, worker
+and proxy restarted; local AI stayed running. The proxy binds to the host's
+Tailscale addresses and redirects old LAN bookmarks. Strict TLS readiness,
+session/CSRF restrictions, live two-label pin/reload/PDF download and collection
+printing navigation pass on desktop/mobile. The latest authentication frontend
+and 12 existing business/account/audit/schema/identity table hashes are preserved;
+database integrity and foreign keys pass. See the
+[native Tailscale runbook](../operations/native-tailnet.md).
+
+## Collection names on labels (deployed 2026-10-03)
+
+All individual and batch PDF label formats now show current collection names
+beneath the box name, with deterministic multi-membership ordering and bounded
+overflow. QR/code size and stock geometry are preserved. All 94 label tests pass,
+including 37 new membership/cache/overflow/QR cases; rendered compact, A4 and
+Letter layouts were visually checked. See [collection-label verification](collection-labels.md).
+This was deployed with the authentication release to the existing native
+installation on 2026-10-03.
+
+## Authentication store and administration (deployed 2026-10-03)
+
+Implemented optional OIDC sign-in, exact provider subject bindings, a protected
+local core administrator, salted and peppered Argon2id passwords, session
+revocation/sign-in history, offline admin recovery and ten public local help
+pages. Migration 0003 preserves old account/data history and old backups; existing
+passwords upgrade on successful login. Provider registration/configuration remains
+an operator step. See [authentication verification and deployment handoff](authentication-store.md).
+
+771 backend tests pass (two opt-in model tests skipped), with all 72 API operations
+exercised; 184 frontend unit tests and 14 browser scenarios pass. Types, lint,
+formatting, OpenAPI, accessibility and final staged build pass. The updated Docker
+image builds and its offline non-root smoke test verifies core setup and help.
+The native installation was upgraded to schema 0003 on 2026-10-03 after a
+rehearsal and private backup; live setup/help and permission checks passed.
+
+## Previous: batch label printing (deployed 2026-10-03)
+
+Boxes can be pinned into an ordered, browser-persisted print list, or a whole
+collection can be printed directly. Letter PDFs lay out ten 4 × 2-inch labels
+per page, with automatic pagination, partly used sheet support and ±3 mm
+alignment adjustments. Collection printing includes archived members. The
+existing individual-label profiles remain available.
+
+682 backend tests pass (two opt-in real-model tests skipped), including all
+61 API operations; 184 frontend units pass. Three new desktop/mobile printing
+browser scenarios, nine existing LAN/organization scenarios and seven signed-in,
+viewer and session-recovery scenarios pass (19 total).
+PDF geometry/font/QR checks, both PDF pages and desktop/mobile visual review,
+WCAG AA checks, types, formatting, lint, OpenAPI validation and staged build pass.
+Deployed to native HTTPS on 2026-10-03 after backing up the database and old
+frontend index. Only web was restarted; worker/proxy/AI, inventory and config
+were preserved. Live two-box pin/reload/PDF-download and collection navigation
+checks pass on desktop/mobile. See [batch printing evidence](batch-label-printing.md).
+
+## Previous: container deployment and separate AI
+
+Rev1 checkpoint `bb5285a` / `rev1-checkpoint` precedes the Docker changes. App,
+HTTPS proxy and optional CPU inference images build; image-only Compose,
+source-build overlays, persistent data/CA/model mounts and explicit remote AI
+configuration are implemented. The UI discloses remote analysis and its
+operator-reported model identity. No Docker Hub image was published.
+
+653 backend tests, 180 frontend units and 8 browser scenarios pass. Disposable
+HTTPS CRUD, persistence across recreation, network-disabled core/backup,
+actual separate-container model inference and manual editing after AI shutdown
+pass. Native services/data remain unchanged. See [container verification](containers.md)
+and the [deployment guide](../operations/deployment.md).
+
+## Previous: native LAN HTTPS
 
 The existing native app now runs at `https://192.0.2.10:8443`, with the old
 HTTP address redirecting and an isolated public certificate setup page at

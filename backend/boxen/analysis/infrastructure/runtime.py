@@ -8,14 +8,18 @@ from boxen.analysis.infrastructure.vision import LocalVision
 from boxen.platform.config import Settings
 
 
-def command(settings, port=8080, threads=8):
+def command(settings, port=8080, threads=8, host="127.0.0.1"):
+    if settings.ai_mode != "local":
+        raise ValueError("Remote AI profiles cannot be executed by the local runtime launcher.")
+    if host not in {"127.0.0.1", "0.0.0.0"}:
+        raise ValueError("Use loopback 127.0.0.1 or explicitly select container-internal 0.0.0.0.")
     if not 1024 <= port <= 65535 or not 1 <= threads <= 64:
         raise ValueError("Use an unprivileged port and 1–64 CPU threads.")
     vision = LocalVision(settings)
     if not vision.profile:
         raise ValueError("A checksum-verified BOXEN_AI_PROFILE is required.")
     profile = vision.profile
-    root = settings.data_dir / "models" / profile["profile_id"]
+    root = settings.models_dir / profile["profile_id"]
     binary = root / profile["runtime"]["path"]
     if profile["runtime"]["id"] != "llama.cpp" or not os.access(binary, os.X_OK):
         raise ValueError("The selected runtime must be an executable llama.cpp server.")
@@ -28,7 +32,7 @@ def command(settings, port=8080, threads=8):
         "--alias",
         profile["model"]["id"],
         "--host",
-        "127.0.0.1",
+        host,
         "--port",
         str(port),
         "--offline",
@@ -67,13 +71,14 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile")
     parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--host", choices=("127.0.0.1", "0.0.0.0"), default="127.0.0.1")
     parser.add_argument("--threads", type=int, default=8)
     parser.add_argument("--print-command", action="store_true")
     args = parser.parse_args()
     settings = Settings.load()
     if args.profile:
         settings = Settings.model_validate({**settings.model_dump(), "ai_profile": args.profile})
-    argv = command(settings, args.port, args.threads)
+    argv = command(settings, args.port, args.threads, args.host)
     if args.print_command:
         print(json.dumps(argv))
         return

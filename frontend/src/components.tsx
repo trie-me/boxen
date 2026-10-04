@@ -1,3 +1,4 @@
+import { PinLabel } from "./print-list";
 import {
   cloneElement,
   isValidElement,
@@ -519,6 +520,7 @@ export function BoxCard({ box }: { box: Schema<"BoxSummary"> }) {
         </div>
       </Link>
       <OrganizationBadges tags={box.tags} collections={box.collections} />
+      <PinLabel box={box} />
     </article>
   );
 }

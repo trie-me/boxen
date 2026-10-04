@@ -42,6 +42,8 @@ class Application:
         self.database = Database(settings)
         self.database.check_schema()
         self.identity = Identity(settings)
+        with self.database.transaction() as repo:
+            self.identity.validate_password_pepper(repo)
         self.catalog = Catalog()
         self.organization = Organization(self.catalog)
         self.inventory = Inventory()
@@ -52,6 +54,26 @@ class Application:
         self.operations = Operations(settings, self.database, self.vision, self.media, self.backups)
         self.pagination = Pagination(settings.secret())
         self.labels = LabelRenderer(settings.assets)
+
+    @staticmethod
+    def label_boxes(repo, boxes: list[dict]) -> list[dict]:
+        """Read current memberships in the label transaction, once for the whole sheet."""
+        if not boxes:
+            return []
+        if len(boxes) > 500:
+            raise DomainError("label.count_invalid", "Choose between 1 and 500 labels per document.")
+        params = {f"box_{index}": box["id"] for index, box in enumerate(boxes)}
+        placeholders = ",".join(":" + key for key in params)
+        rows = repo.rows(
+            "SELECT cb.box_id,c.name FROM collection_boxes cb "
+            "JOIN collections c ON c.id=cb.collection_id "
+            f"WHERE cb.box_id IN ({placeholders}) ORDER BY c.normalized_name,c.id",
+            params,
+        )
+        names: dict[str, list[str]] = {}
+        for row in rows:
+            names.setdefault(row["box_id"], []).append(row["name"])
+        return [{**box, "collection_names": names.get(box["id"], [])} for box in boxes]
 
     def frontend(self, path: str):
         from fastapi.responses import FileResponse, HTMLResponse
@@ -105,7 +127,11 @@ class Application:
 
     def execute(self, operation, params, body, headers, token, client, request_id, write, prepared=None):
         actor = self.preflight(operation, token, headers, request_id, write and operation != "renderBoxLabel")
-        key = headers.get("idempotency-key") if write and operation != "renderBoxLabel" else None
+        key = (
+            headers.get("idempotency-key")
+            if write and operation not in {"renderBoxLabel", "renderLabelSheet"}
+            else None
+        )
         hash_body = {**body, "_params": params, "_if_match": headers.get("if-match")}
         if prepared:
             hash_body["_upload_sha256"] = prepared["sha256"]
@@ -117,6 +143,18 @@ class Application:
         with self.database.transaction(write=write or bootstrap) as repo:
             if actor:
                 actor = self.identity.authenticate(repo, token, request_id, touch=False)
+            if operation in {
+                "listAuthSessions",
+                "revokeAuthSession",
+                "revokeUserSessions",
+                "listAuthEvents",
+                "listUsers",
+                "getUser",
+                "createUser",
+                "updateUser",
+            }:
+                # A retried request must still satisfy the caller's current role.
+                actor.authorize("owner")
             if operation in {
                 "reviewBoxObservations",
                 "createCollection",
@@ -227,6 +265,15 @@ class Application:
         if op == "changeOwnPassword":
             value = self.identity.change_password(repo, body, actor, client)
             return value if isinstance(value, DomainError) else Result(value[0], cookie=value[1])
+        if op == "listAuthSessions":
+            return Result(self.identity.list_sessions(repo, actor, p.get("user_id")))
+        if op == "revokeAuthSession":
+            self.identity.revoke_session(repo, actor, p["session_id"])
+            return Result(status=204)
+        if op == "revokeUserSessions":
+            return Result(self.identity.revoke_user_sessions(repo, actor, p["user_id"]))
+        if op == "listAuthEvents":
+            return Result(self.identity.sign_in_events(repo, actor, p.get("limit", 100)))
         if op in {"updateOwnProfile", "updateUser", "getUser", "createUser", "listUsers"}:
             if op != "updateOwnProfile":
                 actor.authorize("owner")
@@ -475,7 +522,7 @@ class Application:
             )
         if op == "listLabelProfiles":
             return Result({"items": PROFILES})
-        if op == "renderBoxLabel":
+        if op in {"renderBoxLabel", "renderLabelSheet"}:
             actor.authorize("editor")
             self.identity.rate_limit(
                 repo,
@@ -484,14 +531,31 @@ class Application:
                 window=60,
                 consume=True,
             )
-            box = self.catalog.box(repo, p["box_code"])
-            data, tag = self.labels.render(box, p["profile"])
+            if op == "renderBoxLabel":
+                box = self.catalog.box(repo, p["box_code"])
+                box = self.label_boxes(repo, [box])[0]
+                data, tag = self.labels.render(box, p["profile"])
+                filename = f"box-{box['public_code']}.pdf"
+            else:
+                if "collection_id" in body:
+                    collection = self.organization.load(repo, body["collection_id"])
+                    boxes = self.organization.members(repo, collection["id"])
+                else:
+                    boxes = [self.catalog.box(repo, code) for code in body["box_codes"]]
+                boxes = self.label_boxes(repo, boxes)
+                data, tag = self.labels.render_sheet(
+                    boxes,
+                    body.get("start_position", 1),
+                    body.get("offset_x_mm", 0),
+                    body.get("offset_y_mm", 0),
+                )
+                filename = "boxen-labels-letter.pdf"
             return Result(
                 data,
                 media_type="application/pdf",
                 headers={
                     "ETag": tag,
-                    "Content-Disposition": f'attachment; filename="box-{box["public_code"]}.pdf"',
+                    "Content-Disposition": f'attachment; filename="{filename}"',
                 },
             )
         if op == "getSystemStatus":

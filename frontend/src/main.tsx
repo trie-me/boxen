@@ -29,10 +29,14 @@ import {
   SearchBar,
 } from "./components";
 import { Login, Account, System, Users, Backups, Maintenance } from "./system";
+import { AuthenticationAdmin } from "./auth-admin";
+import { Help } from "./help";
 import { Home, Boxes, BoxEditor, BoxDetail, Search, Labels } from "./catalog";
 import { Collections, CollectionDetailPage } from "./organization";
 import { Review } from "./review";
 import { Scan } from "./scan";
+import { PrintLabels } from "./print-labels";
+import { PrintListProvider, PrintListLink } from "./print-list";
 import "./tokens.css";
 import "./style.css";
 
@@ -132,118 +136,126 @@ function Shell() {
       ));
   return (
     <SessionContext.Provider value={session.data}>
-      <a className="skip-link" href="#main">
-        Skip to content
-      </a>
-      <aside className="rail">
-        <Link className="brand" to="/">
-          <Icon size={32} />
-          <span>
-            BOXEN<small>LOCAL INVENTORY NODE</small>
-          </span>
-        </Link>
-        <div className="rail-caption">WORKSPACE / 01</div>
-        <nav aria-label="Primary">
-          {links.map(([to, label, icon]) => (
-            <NavLink key={to} to={to} end={to === "/"}>
-              <Icon name={icon} />
-              <span>{label}</span>
-            </NavLink>
-          ))}
-          <NavLink
-            to="/collections"
-            className="org-desktop-nav"
-            aria-label="Collections"
-          >
-            <Icon name="box" />
-            <span>Collections</span>
-          </NavLink>
-        </nav>
-        <div className="rail-bottom">
-          <div className={"local-state " + (degraded ? "caution" : "")}>
-            <Icon name="shield" size={18} />
+      <PrintListProvider key={user.id}>
+        <a className="skip-link" href="#main">
+          Skip to content
+        </a>
+        <aside className="rail">
+          <Link className="brand" to="/">
+            <Icon size={32} />
             <span>
-              {degraded ? "Local system degraded" : "Local system ready"}
-            </span>
-          </div>
-          <label className="effect-toggle">
-            <input
-              type="checkbox"
-              checked={effects}
-              onChange={(e) => setEffects(e.target.checked)}
-            />
-            Reduce visual effects
-          </label>
-          <Link className="user-link" to="/account">
-            <span className="avatar">{user.display_name.charAt(0)}</span>
-            <span>
-              {anonymous ? "Local access" : user.display_name}
-              <small>
-                {anonymous
-                  ? `Anonymous · ${editor ? "can edit" : "view only"}`
-                  : user.role}
-              </small>
+              BOXEN<small>LOCAL INVENTORY NODE</small>
             </span>
           </Link>
-          {anonymous ? (
-            <Link className="button" to="/login">
-              Sign in
-            </Link>
-          ) : (
-            <button
-              className="ghost"
-              onClick={async () => {
-                await api("/auth/logout", { method: "POST" });
-                cache.clear();
-                setSession(null);
-                cache.removeQueries({ queryKey: ["session"] });
-                navigate("/");
-              }}
+          <div className="rail-caption">WORKSPACE / 01</div>
+          <nav aria-label="Primary">
+            {links.map(([to, label, icon]) => (
+              <NavLink key={to} to={to} end={to === "/"}>
+                <Icon name={icon} />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+            <NavLink
+              to="/collections"
+              className="org-desktop-nav"
+              aria-label="Collections"
             >
-              <Icon name="logout" size={18} />
-              Sign out
-            </button>
-          )}
-        </div>
-      </aside>
-      <div className="workspace">
-        <header className="topbar">
-          <span className="eyebrow">
-            BOXEN <span className="muted">/ PRIVATE BY DESIGN</span>
-          </span>
-          <SearchBar compact />
-          <Link className="button" to="/scan">
-            <Icon name="scan" />
-            Scan code
-          </Link>
-          <Link
-            className="button account-link"
-            to={anonymous ? "/login" : "/account"}
-          >
-            {anonymous ? "Sign in" : "Account"}
-          </Link>
-        </header>
-        {status.error && (
-          <div className="host-banner">
-            <ErrorNote error={status.error} />
-            <button onClick={() => status.refetch()}>Retry</button>
+              <Icon name="box" />
+              <span>Collections</span>
+            </NavLink>
+          </nav>
+          <div className="rail-bottom">
+            <Link className="button" to="/help">
+              Help and setup
+            </Link>
+            <div className={"local-state " + (degraded ? "caution" : "")}>
+              <Icon name="shield" size={18} />
+              <span>
+                {degraded ? "Local system degraded" : "Local system ready"}
+              </span>
+            </div>
+            <label className="effect-toggle">
+              <input
+                type="checkbox"
+                checked={effects}
+                onChange={(e) => setEffects(e.target.checked)}
+              />
+              Reduce visual effects
+            </label>
+            <Link className="user-link" to="/account">
+              <span className="avatar">{user.display_name.charAt(0)}</span>
+              <span>
+                {anonymous ? "Local access" : user.display_name}
+                <small>
+                  {anonymous
+                    ? `Anonymous · ${editor ? "can edit" : "view only"}`
+                    : user.role}
+                </small>
+              </span>
+            </Link>
+            {anonymous ? (
+              <Link className="button" to="/login">
+                Sign in
+              </Link>
+            ) : (
+              <button
+                className="ghost"
+                onClick={async () => {
+                  await api("/auth/logout", { method: "POST" });
+                  cache.clear();
+                  setSession(null);
+                  cache.removeQueries({ queryKey: ["session"] });
+                  navigate("/");
+                }}
+              >
+                <Icon name="logout" size={18} />
+                Sign out
+              </button>
+            )}
           </div>
+        </aside>
+        <div className="workspace">
+          <header className="topbar">
+            <span className="eyebrow">
+              BOXEN <span className="muted">/ PRIVATE BY DESIGN</span>
+            </span>
+            <SearchBar compact />
+            <div className="print-list-access">
+              <PrintListLink />
+            </div>
+            <Link className="button" to="/scan">
+              <Icon name="scan" />
+              Scan code
+            </Link>
+            <Link
+              className="button account-link"
+              to={anonymous ? "/login" : "/account"}
+            >
+              {anonymous ? "Sign in" : "Account"}
+            </Link>
+          </header>
+          {status.error && (
+            <div className="host-banner">
+              <ErrorNote error={status.error} />
+              <button onClick={() => status.refetch()}>Retry</button>
+            </div>
+          )}
+          <main id="main">
+            <Outlet />
+          </main>
+          <footer className="footer">
+            <span>STORED HERE. FOUND HERE.</span>
+            <Link to="/help">Help and setup</Link>
+          </footer>
+        </div>
+        {expired && (
+          <Reauthenticate
+            username={anonymous ? "" : user.username}
+            anonymous={anonymous}
+            close={() => setExpired(false)}
+          />
         )}
-        <main id="main">
-          <Outlet />
-        </main>
-        <footer className="footer">
-          <span>STORED HERE. FOUND HERE.</span>
-          <span>LOCAL STORAGE · NO CLOUD</span>
-        </footer>
-      </div>
-      {expired && (
-        <Reauthenticate
-          username={anonymous ? "" : user.username}
-          anonymous={anonymous}
-          close={() => setExpired(false)}
-        />
-      )}
+      </PrintListProvider>
     </SessionContext.Provider>
   );
 }
@@ -378,6 +390,8 @@ function RouteError() {
 const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
   { path: "/setup", element: <Login setup /> },
+  { path: "/help", element: <Help /> },
+  { path: "/help/:topic", element: <Help /> },
   {
     element: <Shell />,
     errorElement: <RouteError />,
@@ -389,6 +403,8 @@ const router = createBrowserRouter([
       { path: "/boxes/:boxCode/edit", element: <BoxEditor /> },
       { path: "/boxes/:boxCode/label", element: <Labels /> },
       { path: "/search", element: <Search /> },
+      { path: "/print-list", element: <PrintLabels /> },
+      { path: "/collections/:collectionId/labels", element: <PrintLabels /> },
       { path: "/collections", element: <Collections /> },
       { path: "/collections/:collectionId", element: <CollectionDetailPage /> },
       { path: "/scan", element: <Scan /> },
@@ -396,6 +412,7 @@ const router = createBrowserRouter([
       { path: "/account", element: <Account /> },
       { path: "/system", element: <System /> },
       { path: "/system/users", element: <Users /> },
+      { path: "/system/authentication", element: <AuthenticationAdmin /> },
       { path: "/system/backups", element: <Backups /> },
       { path: "/system/maintenance", element: <Maintenance /> },
       {

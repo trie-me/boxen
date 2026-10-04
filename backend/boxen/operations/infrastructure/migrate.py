@@ -5,8 +5,12 @@ from alembic import command
 from alembic.config import Config
 
 ASSETS = Path(__file__).resolve().parents[2] / "assets"
-MIGRATION_SOURCES = {"0001": "schema.sql", "0002": "migrations/0002_organization.sql"}
-CURRENT_SCHEMA_VERSION = "0002"
+MIGRATION_SOURCES = {
+    "0001": "schema.sql",
+    "0002": "migrations/0002_organization.sql",
+    "0003": "migrations/0003_authentication.sql",
+}
+CURRENT_SCHEMA_VERSION = "0003"
 
 
 def migration_history(assets: Path = ASSETS) -> list[tuple[str, str]]:

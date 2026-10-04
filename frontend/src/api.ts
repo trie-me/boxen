@@ -72,6 +72,7 @@ export async function api<T>(
     headers?: Record<string, string>;
     key?: string;
     signal?: AbortSignal;
+    responseType?: "blob";
   } = {},
 ): Promise<T> {
   const method = options.method ?? "GET";
@@ -121,6 +122,7 @@ export async function api<T>(
       fieldErrors(error.errors),
     );
   }
+  if (options.responseType === "blob") return (await response.blob()) as T;
   return response.status === 204 ? (undefined as T) : response.json();
 }
 export const tag = (kind: string, id: string, version: number) =>

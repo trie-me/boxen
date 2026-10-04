@@ -1,0 +1,68 @@
+# Choose this overlay OR compose.ai-remote.yaml, never both.
+# Provision boxen-models before enabling; all consumers verify the same files.
+x-local-ai: &local-ai
+  environment:
+    BOXEN_AI_MODE: local
+    BOXEN_AI_BASE_URL: http://boxen-ai:8080
+    BOXEN_AI_MODELS_DIR: /models
+    BOXEN_AI_PROFILE: ${BOXEN_AI_PROFILE:?Set BOXEN_AI_PROFILE to a provisioned local profile}
+  volumes:
+    - type: volume
+      source: boxen-models
+      target: /models
+      read_only: true
+services:
+  model-import:
+    image: ${BOXEN_AI_IMAGE:-boxen-ai:0.1.0}
+    profiles: [tools]
+    restart: "no"
+    user: "0:0"
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    network_mode: none
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=64m"]
+    volumes:
+      - type: volume
+        source: boxen-models
+        target: /models
+    entrypoint: [python, /opt/boxen/tools/import_container_profile.py]
+    command: [/source, "/models/${BOXEN_AI_PROFILE:?Set BOXEN_AI_PROFILE to a provisioned local profile}"]
+  web:
+    <<: *local-ai
+  worker:
+    <<: *local-ai
+  boxen-ai:
+    <<: *local-ai
+    image: ${BOXEN_AI_IMAGE:-boxen-ai:0.1.0}
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=128m"]
+    environment:
+      BOXEN_ENV: production
+      BOXEN_DATA_DIR: /tmp/boxen-not-used
+      BOXEN_AI_MODE: local
+      BOXEN_AI_BASE_URL: http://127.0.0.1:8080
+      BOXEN_AI_MODELS_DIR: /models
+      BOXEN_AI_PROFILE: ${BOXEN_AI_PROFILE:?Set BOXEN_AI_PROFILE to a provisioned local profile}
+    command: [--host, 0.0.0.0, --threads, "${BOXEN_AI_THREADS:-8}"]
+    networks: [private]
+    restart: unless-stopped
+    pids_limit: 256
+    mem_limit: ${BOXEN_AI_MEMORY:-8g}
+    cpus: ${BOXEN_AI_CPUS:-8}
+    stop_grace_period: 330s
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health',timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      start_period: 180s
+      retries: 6
+    logging:
+      driver: json-file
+      options: {max-size: 10m, max-file: "3"}
+volumes:
+  boxen-models:

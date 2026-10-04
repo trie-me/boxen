@@ -31,6 +31,7 @@ import {
   Submit,
   type SubmitEvent,
 } from "./components";
+import "./auth-admin.css";
 
 export function Login({ setup = false }: { setup?: boolean }) {
   const navigate = useNavigate();
@@ -41,6 +42,35 @@ export function Login({ setup = false }: { setup?: boolean }) {
   const [complete, setComplete] = useState(false);
   const running = useRef(false);
   const status = useQuery(query<Schema<"SetupStatusView">>("/setup/status"));
+  const providers = useQuery({
+    ...query<{ items: { id: string; label: string }[] }>("/auth/providers"),
+    enabled: !setup,
+  });
+  const oauthError = params.has("oauth_error")
+    ? new Error(
+        "Provider sign-in could not be completed. Try again, or use your local username and password. If it continues, ask an owner to check your provider link.",
+      )
+    : null;
+  async function signInWithProvider(id: string) {
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api<{ authorization_url: string }>(
+        `/auth/oidc/${encodeURIComponent(id)}/start`,
+        { method: "POST", body: {} },
+      );
+      const target = new URL(result.authorization_url);
+      if (!["https:", "http:"].includes(target.protocol))
+        throw new Error("The sign-in provider returned an invalid address.");
+      window.location.assign(target.href);
+    } catch (e) {
+      setError(e);
+      running.current = false;
+      setBusy(false);
+    }
+  }
   if (!complete && status.data?.setup_required && !setup)
     return <Navigate to="/setup" replace />;
   if (!complete && status.data && !status.data.setup_required && setup)
@@ -126,9 +156,10 @@ export function Login({ setup = false }: { setup?: boolean }) {
         <h1>{setup ? "Set up your local inventory" : "Welcome back."}</h1>
         <p className="muted">
           {setup
-            ? "Create the first owner account. Everything stays on this Boxen host."
+            ? "Create the core administrator for this Boxen installation. This protected local sign-in keeps system management available."
             : "Sign in for the permissions assigned to your local account."}
         </p>
+        {!setup && <ErrorNote error={oauthError} />}
         {status.isPending ? (
           <Loading label="Checking local account setup…" />
         ) : status.error ? (
@@ -167,6 +198,7 @@ export function Login({ setup = false }: { setup?: boolean }) {
               >
                 <input
                   name="username"
+                  defaultValue={setup ? "admin" : ""}
                   onInput={() => clearField("username")}
                   required
                   minLength={3}
@@ -192,7 +224,7 @@ export function Login({ setup = false }: { setup?: boolean }) {
                 error={fields.password}
                 help={
                   setup
-                    ? "Use at least 12 characters (up to 1024 UTF-8 bytes). Password managers and paste are supported."
+                    ? "Choose a unique password of at least 12 characters (up to 1024 UTF-8 bytes). There is no factory password. Password managers and paste are supported."
                     : undefined
                 }
               >
@@ -212,6 +244,33 @@ export function Login({ setup = false }: { setup?: boolean }) {
               <Icon name="arrow" />
             </Submit>
           </form>
+        )}
+        {!setup && status.data && !status.data.setup_required && (
+          <section className="provider-sign-in" aria-label="Provider sign-in">
+            {providers.isPending ? (
+              <Loading label="Checking sign-in providers…" />
+            ) : providers.error ? (
+              <>
+                <p className="muted">
+                  Provider sign-in is unavailable. You can still use your local
+                  account.
+                </p>
+                <button onClick={() => providers.refetch()}>
+                  Retry sign-in providers
+                </button>
+              </>
+            ) : (
+              providers.data?.items.map((provider) => (
+                <button
+                  key={provider.id}
+                  disabled={busy || complete}
+                  onClick={() => signInWithProvider(provider.id)}
+                >
+                  Continue with {provider.label}
+                </button>
+              ))
+            )}
+          </section>
         )}
         {setup && (
           <details>
@@ -239,8 +298,9 @@ export function Login({ setup = false }: { setup?: boolean }) {
       </section>
       <p className="auth-foot">
         <Icon name="shield" size={16} />
-        Local accounts. Local photos. No cloud services.
+        Local inventory. Sign-in options controlled by your host.
       </p>
+      <Link to="/help">Setup and sign-in help</Link>
       <Link to="/">Return to inventory</Link>
     </main>
   );
@@ -392,7 +452,14 @@ export function System() {
   });
   return (
     <>
-      <PageHead title="Your local system" eyebrow="EVERYTHING RUNS HERE" />
+      <PageHead
+        title="Your local system"
+        eyebrow={
+          status.data?.runtime_offline === false
+            ? "REMOTE AI CONFIGURED"
+            : "YOUR INVENTORY NODE"
+        }
+      />
       <ErrorNote error={status.error} />
       {status.isPending ? (
         <Loading />
@@ -425,7 +492,10 @@ export function System() {
           </div>
           <p className="muted">
             Boxen {status.data?.application_version} · Database schema{" "}
-            {status.data?.schema_version} · All runtime resources are local.
+            {status.data?.schema_version} ·{" "}
+            {status.data?.runtime_offline === false
+              ? "Inventory is stored here. Requested photo analyses use the configured remote AI server."
+              : "All runtime resources are local."}
           </p>
         </>
       )}
@@ -435,24 +505,31 @@ export function System() {
             <Link className="button" to="/system/users">
               Manage users
             </Link>
+            <Link className="button" to="/system/authentication">
+              Authentication & sign-ins
+            </Link>
             <Link className="button" to="/system/backups">
               Backups
             </Link>
             <Link className="button" to="/system/maintenance">
               Integrity & maintenance
             </Link>
+            <Link className="button" to="/help">
+              System help
+            </Link>
           </div>
           <section className="panel">
             <h2>Phones and local HTTPS</h2>
             <p>
               Connect phones to the same local network and open your configured
-              Boxen HTTPS address. Trust the local Caddy CA on each device
-              before using the camera. No public service is needed.
+              Boxen HTTPS address. Review its local certificate warning or
+              install the verified local CA for warning-free access. Camera
+              permission is controlled separately by your browser and device.
             </p>
             <p className="muted">
-              Local AI requires a provisioned, checksum-verified model and
-              projector plus the local inference service. See the installation
-              guide on your host.
+              {status.data?.runtime_offline === false
+                ? "Remote AI is explicitly enabled by this installation's administrator. Photos selected for analysis are sent to that server; its model identity is operator-reported."
+                : "Local AI requires a provisioned, checksum-verified model and projector plus the local inference service. See the installation guide on your host."}
             </p>
           </section>
         </>
@@ -474,6 +551,9 @@ export function Users() {
   return (
     <>
       <PageHead title="Local users">
+        <Link className="button" to="/system/authentication">
+          Authentication & sign-ins
+        </Link>
         <button className="primary" onClick={() => setEditing("new")}>
           Add user
         </button>
@@ -484,19 +564,37 @@ export function Users() {
         last 15 minutes.
       </p>
       <ErrorNote error={users.error} />
+      {users.error && (
+        <button onClick={() => users.refetch()}>Retry users</button>
+      )}
       {users.isPending ? (
         <Loading />
+      ) : users.data?.items.length === 0 ? (
+        <Empty title="No local users" />
       ) : (
         <div className="panel">
           {users.data?.items.map((user) => (
             <article key={user.id} className="inventory-row">
               <div className="item-content">
                 <h2>{user.display_name}</h2>
+                {user.is_system_admin && (
+                  <span className="badge">Core administrator</span>
+                )}
                 <p>
                   {user.username} · {user.role} · {user.status}
                 </p>
+                <small>
+                  {user.local_password
+                    ? "Local password available"
+                    : "Provider sign-in only"}
+                </small>
               </div>
-              <button onClick={() => setEditing(user)}>Edit user</button>
+              <button
+                aria-label={`Edit user ${user.username}`}
+                onClick={() => setEditing(user)}
+              >
+                Edit user
+              </button>
             </article>
           ))}
         </div>
@@ -538,8 +636,12 @@ function UserForm({
           const body = existing
             ? {
                 display_name: name,
-                role,
-                status,
+                ...(!existing.is_system_admin && role !== existing.role
+                  ? { role }
+                  : {}),
+                ...(!existing.is_system_admin && status !== existing.status
+                  ? { status }
+                  : {}),
                 ...(password ? { password } : {}),
               }
             : { display_name: name, username, role, password };
@@ -567,6 +669,8 @@ function UserForm({
           required
           minLength={3}
           maxLength={64}
+          pattern={"[A-Za-z0-9_.\\-]+"}
+          autoComplete="off"
         />
       </Field>
       <Field label="Display name">
@@ -580,6 +684,7 @@ function UserForm({
       <Field label="Role">
         <select
           value={role}
+          disabled={existing?.is_system_admin}
           onChange={(e) => setRole(e.target.value as typeof role)}
         >
           <option>viewer</option>
@@ -591,6 +696,7 @@ function UserForm({
         <Field label="Status">
           <select
             value={status}
+            disabled={existing?.is_system_admin}
             onChange={(e) => setStatus(e.target.value as typeof status)}
           >
             <option>active</option>
@@ -609,8 +715,10 @@ function UserForm({
         />
       </Field>
       <p className="muted">
-        Role, status, or password changes revoke this user’s sessions. The last
-        active owner cannot be disabled or demoted.
+        Role, status, or password changes revoke this user’s sessions.{" "}
+        {existing?.is_system_admin
+          ? "The core administrator must remain active, keep its owner role, and use a local password."
+          : "The last active owner cannot be disabled or demoted."}
       </p>
       <ErrorNote error={error} />
       <Submit busy={busy}>Save user</Submit>

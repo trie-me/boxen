@@ -2,7 +2,11 @@
 
 The native Linux x86-64 CPU path has been exercised with real Qwen3-VL image inference and the full Boxen review/accept/search workflow. See [the current photo-collection repair](../verification/ai-photo-collection.md) and [original verification record](../verification/ai-local-cpu.md) for evidence and limitations. Suggestions always require review: the small model can miss or misidentify objects and quantities. The compact v3 path leaves detailed attributes and bounding boxes null.
 
-Fresh installations still require explicit provisioning. Neither web nor worker downloads models, starts inference, or calls external AI services. Manual inventory remains available when inference is stopped.
+Fresh installations require explicit provisioning. Neither web nor worker
+downloads models or starts inference. Local mode calls no external AI service;
+the new explicitly enabled [remote mode](remote-ai.md) is an optional exception.
+Manual inventory remains available when inference is stopped. For Docker use
+the [separate model container](deployment.md#separate-local-model-container).
 
 ## Start the provisioned native installation
 
@@ -81,4 +85,12 @@ The test uses a disposable database/media store and an anonymous editor session 
 
 Invalid artifacts or a stale prompt manifest produce `ai.profile_invalid`; stopped inference produces `ai.runtime_unavailable`. Exhausting the larger output budget produces `ai.output_truncated` with advice to use closer photos of smaller groups; it does not cause an identical whole-job retry. Truncated, malformed, oversized or schema-invalid responses create no suggestions. Unset `BOXEN_AI_PROFILE` and restart web/worker to disable AI. Do not replace weights under a running process.
 
-Compose still needs a private `boxen-ai` service, provisioned files in the application volume, and `BOXEN_AI_PROFILE` in both application-service environments. Container loopback is not host loopback. GPU, macOS, Windows and container inference are not covered by this CPU smoke record. `--offline` and local paths prevent provisioning during normal inference; this is not an OS firewall/egress-isolation audit.
+Compose now supplies a private `boxen-ai` service through its local-AI overlay,
+with a separate read-only `/models` volume and no published AI port. Use
+`BOXEN_AI_MODELS_DIR` to override the native `$BOXEN_DATA_DIR/models` default.
+The runtime launcher binds loopback unless explicitly passed `--host 0.0.0.0`
+inside that private container network; it refuses remote mode. Container
+loopback is not host loopback. See [container evidence](../verification/containers.md)
+for the new image checks; this older native CPU record does not qualify GPU,
+macOS or Windows. `--offline` prevents runtime provisioning, not all possible
+egress at the operating-system level.

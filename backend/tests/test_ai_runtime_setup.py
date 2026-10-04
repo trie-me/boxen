@@ -38,3 +38,27 @@ def test_runtime_does_not_inherit_network_or_loader_overrides(monkeypatch):
     env = environment()
     assert not any(key.startswith(("LLAMA_", "HF_", "GGML_")) for key in env)
     assert "LD_PRELOAD" not in env
+
+
+def test_runtime_uses_separate_models_directory_and_explicit_container_host(settings, tmp_path):
+    settings.ai_models_dir = tmp_path / "separate-models"
+    sources = []
+    for name in ("model", "projector", "runtime", "license"):
+        path = tmp_path / name
+        path.write_text("Synthetic fixture: " + name)
+        sources.append(path)
+    root = module.provision(settings, "separate", *sources[:3], "test", sources[3:])
+    assert root == settings.models_dir / "separate"
+    assert not (settings.data_dir / "models").exists()
+    settings.ai_profile = "separate"
+    argv = command(settings, host="0.0.0.0")
+    assert argv[argv.index("--host") + 1] == "0.0.0.0"
+    assert argv[0] == str(root / "llama-server")
+    assert argv[argv.index("--model") + 1] == str(root / "model.gguf")
+    assert "--offline" in argv
+    for host in ("192.168.1.5", "::", "localhost", "*"):
+        with pytest.raises(ValueError, match="loopback"):
+            command(settings, host=host)
+    (root / "projector.gguf").write_text("corruption")
+    with pytest.raises(ValueError, match="checksum"):
+        command(settings, host="0.0.0.0")

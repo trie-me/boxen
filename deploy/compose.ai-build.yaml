@@ -1,0 +1,7 @@
+# Add after compose.ai-local.yaml (and compose.build.yaml for app/proxy builds).
+services:
+  boxen-ai:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: ai

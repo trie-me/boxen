@@ -1,0 +1,15 @@
+# Optional bearer authentication; add after compose.ai-remote.yaml.
+# Standalone Compose bind-mounts the file: arrange host permissions so UID 10001
+# can read it. Do not put the key itself in .env or an image build argument.
+x-auth: &auth
+  environment:
+    BOXEN_AI_API_KEY_FILE: /run/secrets/boxen_ai_api_key
+  secrets: [boxen_ai_api_key]
+services:
+  web:
+    <<: *auth
+  worker:
+    <<: *auth
+secrets:
+  boxen_ai_api_key:
+    file: ${BOXEN_AI_API_KEY_SOURCE:?Set BOXEN_AI_API_KEY_SOURCE to the absolute bearer key file path}

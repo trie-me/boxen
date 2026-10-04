@@ -3,6 +3,7 @@ from pathlib import Path
 
 from boxen.api.app import create_app
 from boxen.operations.infrastructure.database import initialize
+from boxen.operations.infrastructure.migrate import CURRENT_SCHEMA_VERSION
 from boxen.platform.application import Application
 from boxen.shared.values import new_id
 from fastapi.testclient import TestClient
@@ -87,5 +88,5 @@ def test_schema_is_locked_and_initialization_is_idempotent(settings):
         assert repo.execute("PRAGMA journal_mode").scalar() == "wal"
         assert repo.execute("PRAGMA foreign_keys").scalar() == 1
         assert repo.execute("PRAGMA integrity_check").scalar() == "ok"
-        assert repo.execute("SELECT version_num FROM alembic_version").scalar() == "0002"
+        assert repo.execute("SELECT version_num FROM alembic_version").scalar() == CURRENT_SCHEMA_VERSION
     app.database.close()

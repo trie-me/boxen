@@ -1,0 +1,17 @@
+# Add to compose.yaml only when building from a source checkout.
+# Both builds use the root .dockerignore, including the proxy build.
+x-build: &app-build
+  context: ..
+  dockerfile: Dockerfile
+  target: app
+services:
+  init:
+    build: *app-build
+  web:
+    build: *app-build
+  worker:
+    build: *app-build
+  caddy:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.caddy

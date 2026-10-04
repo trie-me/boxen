@@ -12,7 +12,8 @@ dependencies = [
   "sqlalchemy>=2.0,<3", "alembic>=1.14", "argon2-cffi>=23.1",
   "markdown-it-py>=3", "nh3>=0.2", "pillow>=11", "segno>=1.6",
   "reportlab>=4", "python-multipart>=0.0.20", "httpx>=0.28",
-  "jsonschema>=4.23", "pyyaml>=6", "referencing>=0.36"
+  "jsonschema>=4.23", "pyyaml>=6", "referencing>=0.36",
+  "pyjwt[crypto]>=2.10.1,<3",
 ]
 
 [project.scripts]

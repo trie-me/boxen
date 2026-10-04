@@ -504,6 +504,14 @@ export function CollectionDetailPage() {
           All collections
         </Link>
         {editor && (
+          <Link
+            className="button primary"
+            to={"/collections/" + c.id + "/labels"}
+          >
+            Print collection labels
+          </Link>
+        )}
+        {editor && (
           <button onClick={() => setEditing(structuredClone(c))}>
             Edit collection
           </button>

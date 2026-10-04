@@ -21,7 +21,9 @@ export default defineConfig({
     env: {
       BOXEN_TEST_FRONTEND_DIR:
         process.env.BOXEN_TEST_FRONTEND_DIR ??
-        fileURLToPath(new URL("../.local/search-suggestions-build", import.meta.url)),
+        fileURLToPath(
+          new URL("../.local/search-suggestions-build", import.meta.url),
+        ),
     },
   },
 });

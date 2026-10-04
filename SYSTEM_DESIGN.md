@@ -15,7 +15,18 @@
 
 **Contextual search:** [ADR-0009](docs/system-design/adrs/0009-contextual-search-suggestions.md) adds local typeahead: meaningful `BX-` prefixes suggest boxes; ordinary text suggests confirmed contents, tags and collections. Submitted full-text search remains unchanged.
 
+**Authentication and administration:** [ADR-0011](docs/system-design/adrs/0011-authentication-store-and-core-admin.md)
+adds optional OIDC sign-in, explicit subject bindings, a protected local core
+administrator, salted and peppered passwords, session/audit administration and
+public local help. Local sign-in and core inventory remain usable offline;
+explicitly configured OIDC requires its provider's network connection.
+
 ## Purpose
+
+**Container deployment:** [ADR-0010](docs/system-design/adrs/0010-container-deployment-and-ai-boundary.md)
+defines the image/volume layout and separate inference execution. Local/offline
+remains the default; an explicitly enabled remote vision server is an optional
+exception to the same-host runtime guarantee, not a fallback.
 
 This is the authoritative entry point for Boxen. The linked specifications define the system closely enough that implementation can proceed without inventing domain rules, interfaces, states, storage behavior, UI behavior, or verification criteria.
 
@@ -25,7 +36,9 @@ The words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are no
 
 Boxen is a private, self-hosted web application for recording physical storage boxes and their contents. It stores structured state in SQLite, associates local images with boxes, uses a locally hosted vision-language model to propose inventory items, renders user descriptions as safe Markdown, searches names/descriptions/items, prints QR labels, and retrieves a box through live scanning, QR-image upload, or typed code.
 
-Once installed and provisioned, the complete runtime MUST function without internet access or any non-local service.
+Once installed and provisioned, core inventory and local sign-in MUST function
+without internet access. Explicitly enabled remote AI and OIDC have the external
+dependencies described in ADR-0010 and ADR-0011.
 
 ## Authoritative specification set
 
@@ -56,6 +69,8 @@ Once installed and provisioned, the complete runtime MUST function without inter
 - [ADR-0007: Editable chip-set review](docs/system-design/adrs/0007-chip-set-review.md)
 - [ADR-0008: Tags and collections](docs/system-design/adrs/0008-tags-and-collections.md)
 - [ADR-0009: Contextual search suggestions](docs/system-design/adrs/0009-contextual-search-suggestions.md)
+- [ADR-0010: Container deployment and AI execution boundary](docs/system-design/adrs/0010-container-deployment-and-ai-boundary.md)
+- [ADR-0011: Authentication store and protected core administrator](docs/system-design/adrs/0011-authentication-store-and-core-admin.md)
 
 ## Fixed v1 decisions
 

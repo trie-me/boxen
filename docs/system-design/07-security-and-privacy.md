@@ -1,5 +1,11 @@
 # Security and Privacy Specification
 
+Current authentication behavior is amended by
+[ADR-0011](adrs/0011-authentication-store-and-core-admin.md): protected local core
+administrator, salted and peppered passwords, explicit OIDC subject bindings,
+session/sign-in administration, and documented offline recovery. The operational
+[authentication help](../help/authentication.md) describes configuration.
+
 ## 1. Security objective
 
 Boxen protects private household/workshop inventory, images, local credentials, and backups on a single local host. “Local” does not mean trusted: the LAN, browser inputs, uploaded files, QR payloads, model output, and non-owner users are untrusted.

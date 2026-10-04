@@ -627,6 +627,13 @@ function PhotoCollection({ box, editable }: { box: Box; editable: boolean }) {
         to appear, and items need not be inside it. JPEG, PNG or WebP, up to 25
         MB each.
       </p>
+      {system.data?.runtime_offline === false && (
+        <p className="notice caution" role="note">
+          Remote AI is configured. Choosing Analyze sends the selected photos to
+          the administrator's AI server. Originals and confirmed inventory
+          remain stored on this Boxen host.
+        </p>
+      )}
       {editable && photos.length > 0 && (
         <div className="notice ai-note">
           <p>
@@ -848,15 +855,15 @@ function PhotoCollection({ box, editable }: { box: Box; editable: boolean }) {
       ) : (
         <Empty title="Build a visual contents collection">
           <p>
-            Add photos of the items assigned to this box. Photos stay on your
-            local host.
+            Add photos of the items assigned to this box. Originals are stored
+            on your Boxen host.
           </p>
         </Empty>
       )}
       {editable && !aiReady && (
         <div className="notice ai-note">
-          Local AI is not ready. Photos, manual inventory, and existing AI
-          review remain available.
+          AI is not ready. Photos, manual inventory, and existing AI review
+          remain available.
         </div>
       )}
       {editing && (

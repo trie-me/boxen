@@ -29,6 +29,8 @@ def provision(
     max_image_edge=768,
     max_output_tokens=4096,
 ):
+    if settings.ai_mode != "local":
+        raise ValueError("Provision local artifacts with BOXEN_AI_MODE=local.")
     if not re.fullmatch(r"[a-z][a-z0-9._-]{0,79}", profile_id):
         raise ValueError("Use a lower-case profile ID with letters, digits, dot, underscore, or hyphen.")
     if not licenses:
@@ -48,7 +50,7 @@ def provision(
             raise ValueError("Runtime library paths must be files with unique names.")
         libraries.append((path.name, source))
     os.umask(0o077)
-    root = settings.data_dir / "models" / profile_id
+    root = settings.models_dir / profile_id
     root.mkdir(parents=True, exist_ok=False, mode=0o700)
     identities = {}
     for kind, source, name in zip(
