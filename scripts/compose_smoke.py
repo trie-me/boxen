@@ -6,6 +6,7 @@ and removes only a fresh, uniquely named Compose project and its test volumes.
 """
 
 import argparse
+import hashlib
 import io
 import ipaddress
 import json
@@ -201,12 +202,20 @@ def main():
                 )
                 assert item.status_code == 201, item.text
                 photo = io.BytesIO()
-                Image.new("RGB", (180, 100), "green").save(photo, "PNG")
+                Image.new("RGB", (3600, 1800), "green").save(photo, "PNG")
                 uploaded = client.post(
                     f"/api/v1/boxes/{code}/images",
                     files={"file": ("fixture.png", photo.getvalue(), "image/png")},
                 )
                 assert uploaded.status_code == 201, uploaded.text
+                original_url = f"/api/v1/images/{uploaded.json()['id']}/content?variant=original"
+                original = client.get(original_url)
+                assert original.status_code == 200 and original.headers["content-type"] == "image/webp"
+                assert hashlib.sha256(original.content).hexdigest() == uploaded.json()["sha256"]
+                with Image.open(io.BytesIO(original.content)) as stored:
+                    assert stored.format == "WEBP" and stored.size == (2048, 1024)
+                assert len(original.content) < len(photo.getvalue())
+                assert client.get(uploaded.json()["display_url"]).content == original.content
                 thumbnail = uploaded.json()["thumbnail_url"]
                 assert client.get(thumbnail).status_code == 200
                 assert code in client.get("/api/v1/search", params={"q": "Persistence cable"}).text
@@ -283,6 +292,7 @@ def main():
                 assert client.get("/api/v1/boxes/" + code).json()["name"] == "Container persistence"
                 assert client.get(thumbnail).status_code == 200
                 assert code in client.get("/api/v1/search?q=Persistence").text
+                assert client.get(original_url).content == original.content
                 # Same CA still verifies; same session cookie still works.
                 assert client.get("/api/v1/session").json()["csrf_token"] == session.json()["csrf_token"]
                 if args.model_profile:
@@ -338,6 +348,7 @@ def main():
                         "https_verified": True,
                         "tailnet_ipv6_and_legacy_redirects": bool(args.tailnet_host),
                         "anonymous_crud_media_search_labels": "pass",
+                        "normalized_webp_upload_and_persistence": "pass",
                         "worker": "ready",
                         "recreation_persistence_and_ca": "pass",
                         "owner_setup_and_required_login": "pass",

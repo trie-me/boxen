@@ -204,7 +204,7 @@ The application tree is:
   data/
     db/boxen.sqlite3       # inventory, users, jobs and search
     db/                   # SQLite WAL/SHM and coordination locks
-    media/originals/      # authoritative uploaded photos
+    media/originals/      # normalized WebP uploads and unchanged legacy photos
     media/display/        # rebuildable derivatives
     media/thumbnails/
     media/staging/
@@ -220,6 +220,8 @@ The application tree is:
 Named volumes receive the expected ownership from the images. For a bind mount, create a dedicated directory and give only that directory to UID/GID 10001. Private installation secrets must not be accessible to other users. Do not fix permissions by recursively changing your home directory or running the application as root. Existing private model files should be copied through the explicit `model-import` tool, which leaves the source read-only and never mounts inventory.
 
 Capacity must cover originals, derivatives, backups, a complete restore staging copy and retained quarantines, with the production free-space reserve left over. Model files and Docker build caches also consume disk space.
+
+New uploads use WebP quality 85, a maximum 2,048-pixel longest edge and a 480-pixel thumbnail, preserving proportions without upscaling. The full-size display shares the stored WebP rather than duplicating it. These are fixed encoding defaults; upload byte/pixel limits still apply to incoming files before conversion. Existing photos and previous backups are not rewritten.
 
 ## Backups, upgrades and moving hosts
 

@@ -625,12 +625,13 @@ function PhotoCollection({ box, editable }: { box: Box; editable: boolean }) {
         Together, these photos represent the items assigned to this box. Use
         staged items, close-ups or reference views; the container does not need
         to appear, and items need not be inside it. JPEG, PNG or WebP, up to 25
-        MB each.
+        MB each. Uploads are saved as WebP, up to 2,048 pixels on the longest
+        edge, to save space. Smaller photos keep their size.
       </p>
       {system.data?.runtime_offline === false && (
         <p className="notice caution" role="note">
           Remote AI is configured. Choosing Analyze sends the selected photos to
-          the administrator's AI server. Originals and confirmed inventory
+          the administrator's AI server. Saved photos and confirmed inventory
           remain stored on this Boxen host.
         </p>
       )}
@@ -855,8 +856,8 @@ function PhotoCollection({ box, editable }: { box: Box; editable: boolean }) {
       ) : (
         <Empty title="Build a visual contents collection">
           <p>
-            Add photos of the items assigned to this box. Originals are stored
-            on your Boxen host.
+            Add photos of the items assigned to this box. Optimized photos are
+            stored on your Boxen host.
           </p>
         </Empty>
       )}

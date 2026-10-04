@@ -77,7 +77,7 @@ def test_upload_failure_reconciles_orphan_without_losing_referenced_objects(clie
         assert repo.find("box_images") == []
     recovery = app.media.reconcile(grace_seconds=0)
     assert recovery["objects_quarantined"] == 1
-    assert len(list((app.settings.data_dir / "media/quarantine").rglob("*.png"))) == 1
+    assert len(list((app.settings.data_dir / "media/quarantine").rglob("*.webp"))) == 1
 
 
 def test_schema_is_locked_and_initialization_is_idempotent(settings):

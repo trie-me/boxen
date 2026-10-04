@@ -9,6 +9,8 @@
 
 **Photo collection clarification:** [ADR-0006](docs/system-design/adrs/0006-photo-collection-inventory.md) defines photos as views representing one box's contents, including staged items and close-ups without a visible container. Independent photo analysis feeds shared inventory review; repeated views must not silently increase quantities.
 
+**Photo storage:** [ADR-0012](docs/system-design/adrs/0012-normalized-photo-storage.md) supersedes raw upload retention for new photos: store WebP at quality 85 with a maximum 2,048-pixel edge. Existing originals remain unchanged; backups preserve each photo's stored bytes.
+
 **Review interface:** [ADR-0007](docs/system-design/adrs/0007-chip-set-review.md) replaces per-suggestion action cards with removable item chips, an add-item field and one atomic acceptance of the edited set. Quantity and source details remain available on demand.
 
 **Box organization:** [ADR-0008](docs/system-design/adrs/0008-tags-and-collections.md) adds reusable tags and overlapping named collections, with filterable itemization that retains each item's source box and quantity.
@@ -71,6 +73,7 @@ dependencies described in ADR-0010 and ADR-0011.
 - [ADR-0009: Contextual search suggestions](docs/system-design/adrs/0009-contextual-search-suggestions.md)
 - [ADR-0010: Container deployment and AI execution boundary](docs/system-design/adrs/0010-container-deployment-and-ai-boundary.md)
 - [ADR-0011: Authentication store and protected core administrator](docs/system-design/adrs/0011-authentication-store-and-core-admin.md)
+- [ADR-0012: Normalize new photo uploads](docs/system-design/adrs/0012-normalized-photo-storage.md)
 
 ## Fixed v1 decisions
 

@@ -14,6 +14,8 @@ Keep `boxen worker` running. After an active owner exists it requests a backup w
 
 Backups are stored at `$BOXEN_DATA_DIR/backups/backup-<id>`. They contain a SQLite online snapshot, referenced ready-image originals, public settings, a manifest and checksums. Creation verifies DB integrity, foreign keys, referenced originals and checksums. Derivatives, session secrets, model weights and Caddy CA state are not included. The backup resides on the same disk by default; copy verified generations to protected separate storage for disk-loss protection. Backups are not encrypted by this application.
 
+For new uploads, “originals” means the stored, normalized WebP (maximum 2,048-pixel edge), not the file before upload. Older photos keep their existing format and bytes. Both are included in backups. Derivative repair rebuilds previews from these stored files without modifying them; it does not recompress existing originals or recover discarded upload resolution/metadata.
+
 The current schema is **0003** (authentication store, following tags and collections). Known
 0001, 0002 and 0003 backup histories are accepted only with their exact pinned migration
 checksums and matching Alembic head (or the supported pre-Alembic 0001 history).

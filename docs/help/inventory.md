@@ -12,6 +12,8 @@ Archive boxes when they are no longer in daily use. Restore them when needed. Pe
 
 Attach photos of packed contents, items laid out beside a box, close-ups or reference views. Photos collectively document that box. **Analyze all photos** runs separate analyses and gathers suggestions into a shared review. The model does not jointly recognize duplicates across photos.
 
+New JPEG, PNG and WebP uploads are saved as **WebP at quality 85, with a maximum longest edge of 2,048 pixels**. Boxen preserves proportions and transparency, applies camera orientation, removes embedded metadata, and never enlarges smaller photos. The full-size view uses this optimized file; a 480-pixel thumbnail keeps browsing light. The uncompressed or larger source upload is not retained, so keep your own source copy if you need it. Existing photos are unchanged.
+
 Review each suggestion, remove unwanted chips, add missing items, edit quantities and accept the final set. Link repeated views to an existing item to avoid double counting. Suggestions do not become inventory until reviewed. **Analyze again** creates new suggestions and asks for confirmation. Model output may be incomplete or wrong; manual editing always remains available.
 
 [Local AI](/help/models) explains installation and [Remote AI](/help/remote-ai) explains deliberate use of an external endpoint and what leaves the host.

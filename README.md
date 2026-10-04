@@ -6,6 +6,7 @@
 - **Organize a move or a room:** group boxes into collections without duplicating inventory.
 - **Print a sheet of labels:** pin boxes from cards, search results or box details, then open **Print list**. Or open a collection and choose **Print collection labels**.
 - **Look up a box:** scan its QR label or enter its code.
+- **Keep photo storage small:** new uploads become WebP images, up to 2,048 pixels on the longest edge, with smaller thumbnails for browsing.
 - **Optional photo assistance:** run a local vision model, review its suggestions and accept the items you want. AI is optional; manual inventory always works.
 
 ## Run with Docker

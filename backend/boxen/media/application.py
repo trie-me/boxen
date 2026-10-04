@@ -100,7 +100,15 @@ class Media:
                 check=True,
             )
             data = json.loads(result.stdout)
-            return {**data, "path": path, "sha256": file_hash(path), "byte_size": path.stat().st_size}
+            # The full-size WebP is authoritative for new uploads. Keep the input
+            # staged until the request's finally block clears it, including on errors.
+            normalized = path.with_suffix(".display.webp")
+            return {
+                **data,
+                "path": path,
+                "sha256": file_hash(normalized),
+                "byte_size": normalized.stat().st_size,
+            }
         except (subprocess.SubprocessError, ValueError):
             raise DomainError(
                 "image.invalid", "Use a valid, single-frame JPEG, PNG, or WebP photo within the image limits."
@@ -139,24 +147,23 @@ class Media:
         }
         repo.insert("box_images", row)
         path = prepared["path"]
-        original = self.store.commit(path, "originals", prepared["sha256"], prepared["extension"])
-        # Derivative keys use actual bytes, not the original digest, so renderer upgrades cannot overwrite old bytes.
         display_path = path.with_suffix(".display.webp")
+        original = self.store.commit(display_path, "originals", prepared["sha256"], prepared["extension"])
+        # Viewing and backup use the same normalized file, without a second full-size copy.
         thumb_path = path.with_suffix(".thumbnail.webp")
-        display = self.store.commit(display_path, "display", file_hash(display_path), "webp")
         thumbnail = self.store.commit(thumb_path, "thumbnails", file_hash(thumb_path), "webp")
         repo.update(
             "box_images",
             {
                 "lifecycle": "ready",
                 "original_storage_key": original,
-                "display_storage_key": display,
+                "display_storage_key": original,
                 "thumbnail_storage_key": thumbnail,
                 "media_type": prepared["media_type"],
                 "byte_size": prepared["byte_size"],
                 "width": prepared["width"],
                 "height": prepared["height"],
-                "derivative_renderer_version": "pillow-webp-v1",
+                "derivative_renderer_version": "pillow-webp-v2",
             },
             id=image_id,
         )

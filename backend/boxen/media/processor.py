@@ -30,7 +30,11 @@ def process(path: Path, max_pixels: int) -> dict:
     with Image.open(path, formats=["JPEG", "PNG", "WEBP"]) as source:
         image = ImageOps.exif_transpose(source)
         image.load()
-        normalized = image.convert("RGB")
+        # Keep transparency, orient before resizing, and never enlarge a small photo.
+        mode = "RGBA" if "A" in image.getbands() or "transparency" in image.info else "RGB"
+        normalized = image.convert(mode)
+        normalized.thumbnail((2048, 2048), Image.Resampling.LANCZOS)
+        normalized.info.clear()
         width, height = normalized.size
         for kind, edge in (("display", 2048), ("thumbnail", 480)):
             derivative = normalized.copy()
@@ -42,10 +46,11 @@ def process(path: Path, max_pixels: int) -> dict:
                 method=4,
                 exif=b"",
                 icc_profile=b"",
+                xmp=b"",
             )
         return {
-            "media_type": {"JPEG": "image/jpeg", "PNG": "image/png", "WEBP": "image/webp"}[media_format],
-            "extension": {"JPEG": "jpg", "PNG": "png", "WEBP": "webp"}[media_format],
+            "media_type": "image/webp",
+            "extension": "webp",
             "width": width,
             "height": height,
         }
