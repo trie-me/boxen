@@ -124,7 +124,9 @@ def test_proxy_bundles_configuration_and_keeps_ca_state_in_named_volumes():
         "/data": {"source": "caddy-data", "target": "/data", "read_only": False},
         "/config": {"source": "caddy-config", "target": "/config", "read_only": False},
     }
-    assert "COPY deploy/Caddyfile /etc/caddy/Caddyfile" in (DEPLOY / "Dockerfile.caddy").read_text()
+    dockerfile = (DEPLOY / "Dockerfile.caddy").read_text()
+    for name in ("Caddyfile", "Caddyfile.tailnet"):
+        assert f"COPY --chmod=644 deploy/{name} /etc/caddy/{name}" in dockerfile
 
 
 def test_builds_are_opt_in_and_share_the_root_ignore_file():
