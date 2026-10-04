@@ -679,7 +679,12 @@ export function Search() {
               <article key={r.box.code} className="panel search-result">
                 <Link to={"/boxes/" + r.box.code}>
                   {r.box.representative_thumbnail_url ? (
-                    <img src={r.box.representative_thumbnail_url} alt="" />
+                    <img
+                      src={r.box.representative_thumbnail_url}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <Icon size={60} />
                   )}

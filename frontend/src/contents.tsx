@@ -747,6 +747,7 @@ function PhotoCollection({ box, editable }: { box: Box; editable: boolean }) {
                   src={photo.thumbnail_url ?? ""}
                   alt={photo.caption || `Photo ${index + 1} of ${box.name}`}
                   loading="lazy"
+                  decoding="async"
                 />
               </a>
               <div>

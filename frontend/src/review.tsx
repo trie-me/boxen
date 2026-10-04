@@ -471,6 +471,7 @@ function ChipDetails({
           <img
             src={photo.thumbnail_url ?? ""}
             alt={photo.caption || "Source photo"}
+            decoding="async"
           />
           <p>
             {String(

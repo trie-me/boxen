@@ -484,7 +484,12 @@ export function BoxCard({ box }: { box: Schema<"BoxSummary"> }) {
       <Link to={"/boxes/" + box.code} className="box-link">
         <div className="box-visual">
           {box.representative_thumbnail_url ? (
-            <img src={box.representative_thumbnail_url} alt="" loading="lazy" />
+            <img
+              src={box.representative_thumbnail_url}
+              alt=""
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <>
               <Icon size={74} />
